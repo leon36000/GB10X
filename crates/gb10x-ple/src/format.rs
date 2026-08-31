@@ -95,17 +95,13 @@ impl PlePackHeader {
         index_digest: [u8; 32],
     ) -> Result<Self, PlePackError> {
         if row_count == 0 {
-            return Err(PlePackError::InvalidGeometry(
-                "row_count must be nonzero",
-            ));
+            return Err(PlePackError::InvalidGeometry("row_count must be nonzero"));
         }
         if row_bytes == 0 {
             return Err(PlePackError::InvalidGeometry("row_bytes must be nonzero"));
         }
         if block_bytes == 0 {
-            return Err(PlePackError::InvalidGeometry(
-                "block_bytes must be nonzero",
-            ));
+            return Err(PlePackError::InvalidGeometry("block_bytes must be nonzero"));
         }
         if block_bytes < row_bytes {
             return Err(PlePackError::InvalidGeometry(
