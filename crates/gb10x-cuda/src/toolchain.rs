@@ -21,12 +21,22 @@ mod tests {
     }
 
     #[test]
-    fn pre_cuda_13_is_rejected_for_m2() {
+    fn cuda_12_8_is_rejected_for_sm121a_m2() {
+        let version = NvccVersion {
+            major: 12,
+            minor: 8,
+            patch: None,
+        };
+        assert!(validate_nvcc_for_gb10(&version).is_err());
+    }
+
+    #[test]
+    fn cuda_12_9_is_accepted_for_sm121a_m2() {
         let version = NvccVersion {
             major: 12,
             minor: 9,
             patch: None,
         };
-        assert!(validate_nvcc_for_gb10(&version).is_err());
+        validate_nvcc_for_gb10(&version).expect("CUDA 12.9 supports sm_121a");
     }
 }
