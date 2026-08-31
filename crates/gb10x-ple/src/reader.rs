@@ -100,6 +100,23 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
             .is_some()
     }
 
+    /// Verify every stored hot-overlay row byte-for-byte against the immutable exact source.
+    pub fn verify_hot_overlay(&self) -> Result<u64, PlePackIoError> {
+        let mut expected = vec![0_u8; self.header.row_bytes as usize];
+
+        for ordinal in 0..self.hot_row_count {
+            let (logical_row, overlay_offset) = self.index_entry(ordinal)?;
+            self.source.read_exact_row(logical_row, &mut expected)?;
+            let actual = self.overlay_row(overlay_offset, "overlay verification")?;
+            if actual != expected.as_slice() {
+                return Err(PlePackIoError::OverlayDataMismatch { logical_row });
+            }
+        }
+
+        u64::try_from(self.hot_row_count)
+            .map_err(|_| PlePackIoError::Format("hot row count does not fit u64"))
+    }
+
     /// Read one logical row exactly, preferring the mmap hot overlay and falling back to source.
     pub fn read_exact_row(&self, logical_row: u32, dst: &mut [u8]) -> Result<(), PlePackIoError> {
         if logical_row as u64 >= self.header.row_count {
@@ -118,33 +135,56 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
         }
 
         if let Some(overlay_offset) = self.find_overlay_offset(logical_row)? {
-            let relative_end = overlay_offset
-                .checked_add(self.header.row_bytes as u64)
-                .ok_or(PlePackIoError::Format("overlay row end overflow"))?;
-            if relative_end > self.overlay_bytes {
-                return Err(PlePackIoError::Format(
-                    "overlay row exceeds verified data region",
-                ));
-            }
-            let absolute = (self.data_offset as u64)
-                .checked_add(overlay_offset)
-                .ok_or(PlePackIoError::Format(
-                    "overlay absolute row offset overflow",
-                ))?;
-            let start = usize::try_from(absolute)
-                .map_err(|_| PlePackIoError::Format("overlay row offset does not fit usize"))?;
-            let end = start
-                .checked_add(expected)
-                .ok_or(PlePackIoError::Format("overlay row slice end overflow"))?;
-            let row = self
-                .mmap
-                .get(start..end)
-                .ok_or(PlePackIoError::Format("overlay row lies outside sidecar"))?;
-            dst.copy_from_slice(row);
+            dst.copy_from_slice(self.overlay_row(overlay_offset, "overlay")?);
             return Ok(());
         }
 
         self.source.read_exact_row(logical_row, dst)
+    }
+
+    fn overlay_row(
+        &self,
+        overlay_offset: u64,
+        context: &'static str,
+    ) -> Result<&[u8], PlePackIoError> {
+        let row_bytes = self.header.row_bytes as u64;
+        let relative_end = overlay_offset
+            .checked_add(row_bytes)
+            .ok_or(PlePackIoError::Format(match context {
+                "overlay verification" => "overlay verification row end overflow",
+                _ => "overlay row end overflow",
+            }))?;
+        if relative_end > self.overlay_bytes {
+            return Err(PlePackIoError::Format(match context {
+                "overlay verification" => "overlay verification row exceeds data region",
+                _ => "overlay row exceeds verified data region",
+            }));
+        }
+        let absolute = (self.data_offset as u64)
+            .checked_add(overlay_offset)
+            .ok_or(PlePackIoError::Format(match context {
+                "overlay verification" => "overlay verification absolute offset overflow",
+                _ => "overlay absolute row offset overflow",
+            }))?;
+        let start = usize::try_from(absolute).map_err(|_| {
+            PlePackIoError::Format(match context {
+                "overlay verification" => "overlay verification offset does not fit usize",
+                _ => "overlay row offset does not fit usize",
+            })
+        })?;
+        let row_len = self.header.row_bytes as usize;
+        let end = start.checked_add(row_len).ok_or(PlePackIoError::Format(
+            match context {
+                "overlay verification" => "overlay verification slice end overflow",
+                _ => "overlay row slice end overflow",
+            },
+        ))?;
+        self.mmap.get(start..end).ok_or(PlePackIoError::Format(
+            match context {
+                "overlay verification" => "overlay verification row lies outside sidecar",
+                _ => "overlay row lies outside sidecar",
+            },
+        ))
     }
 
     fn find_overlay_offset(&self, logical_row: u32) -> Result<Option<u64>, PlePackIoError> {
