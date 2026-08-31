@@ -3,6 +3,7 @@
 
 //! Exact PLE storage/layout support for GB10X.
 
+mod disk;
 mod format;
 mod layout;
 mod reader;
