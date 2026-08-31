@@ -308,7 +308,8 @@ impl Qwen38Config {
             }
         }
 
-        if self.ple_rows_per_token() == 0 || self.ple_embed_dim % self.ple_rows_per_token() != 0 {
+        let ple_rows = self.ple_rows_per_token();
+        if ple_rows == 0 || !self.ple_embed_dim.is_multiple_of(ple_rows) {
             return Err(Qwen38ConfigError::Contract(
                 "PLE width is not divisible by selected row count".to_owned(),
             ));
