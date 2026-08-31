@@ -4,5 +4,7 @@
 //! Core immutable contracts for GB10X.
 
 mod platform;
+mod qwen38;
 
 pub use platform::*;
+pub use qwen38::*;
