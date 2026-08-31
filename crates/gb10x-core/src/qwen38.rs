@@ -257,7 +257,11 @@ impl Qwen38Config {
         expect_usize("ngram_size", self.ngram_size, 3)?;
         expect_usize("heads_per_ngram", self.heads_per_ngram, 8)?;
         expect_usize("split_ngram_parts", self.split_ngram_parts, 128)?;
-        expect_usize("ngram_vocab_size_base", self.ngram_vocab_size_base, 20_000_000)?;
+        expect_usize(
+            "ngram_vocab_size_base",
+            self.ngram_vocab_size_base,
+            20_000_000,
+        )?;
         expect_usize(
             "make_ngram_vocab_size_divisible_by",
             self.make_ngram_vocab_size_divisible_by,
@@ -268,7 +272,11 @@ impl Qwen38Config {
         expect_usize("indexer_head_dim", self.indexer_head_dim, 128)?;
         expect_usize("indexer_compress_ratio", self.indexer_compress_ratio, 4)?;
         expect_usize("indexer_budget", self.indexer_budget, 2048)?;
-        expect_usize("max_position_embeddings", self.max_position_embeddings, 262_144)?;
+        expect_usize(
+            "max_position_embeddings",
+            self.max_position_embeddings,
+            262_144,
+        )?;
         if self.eos_token_id != 248_044 {
             return Err(contract_mismatch(
                 "eos_token_id",
