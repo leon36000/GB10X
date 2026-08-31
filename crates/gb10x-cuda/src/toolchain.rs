@@ -14,7 +14,10 @@ mod tests {
     fn nvcc_release_line_is_parsed_exactly() {
         let version = parse_nvcc_version("Cuda compilation tools, release 13.2, V13.2.51")
             .expect("valid nvcc release line");
-        assert_eq!((version.major, version.minor, version.patch), (13, 2, Some(51)));
+        assert_eq!(
+            (version.major, version.minor, version.patch),
+            (13, 2, Some(51))
+        );
     }
 
     #[test]
