@@ -39,7 +39,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn parse_arg<T>(value: Option<std::ffi::OsString>, name: &str) -> Result<T, Box<dyn std::error::Error>>
+fn parse_arg<T>(
+    value: Option<std::ffi::OsString>,
+    name: &str,
+) -> Result<T, Box<dyn std::error::Error>>
 where
     T: std::str::FromStr,
     T::Err: std::error::Error + 'static,
