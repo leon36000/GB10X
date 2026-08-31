@@ -77,7 +77,7 @@ impl DiskHeader {
         if bytes.len() < DISK_HEADER_BYTES as usize {
             return Err(PlePackIoError::Format("sidecar is shorter than header"));
         }
-        if bytes[0..8] != PLEPACK_MAGIC {
+        if bytes.get(0..8) != Some(PLEPACK_MAGIC.as_slice()) {
             return Err(PlePackIoError::Format("PLEPack magic mismatch"));
         }
         if read_u32(bytes, 8)? != PLEPACK_VERSION {
