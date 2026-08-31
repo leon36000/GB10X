@@ -108,11 +108,46 @@ pub fn validate_gb10(snapshot: &PlatformSnapshot) -> Result<Gb10Validation, Plat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gb10x_core::PlatformSnapshot;
+    use gb10x_core::{CacheType, CpuCache, GpuSnapshot, PlatformSnapshot};
+
+    fn gb10_fixture() -> PlatformSnapshot {
+        PlatformSnapshot {
+            arch: "aarch64".to_owned(),
+            kernel_release: "test-linux".to_owned(),
+            cpu_model: "NVIDIA GB10".to_owned(),
+            online_cpus: (0..20).collect(),
+            caches: vec![
+                CpuCache {
+                    level: 2,
+                    cache_type: CacheType::Unified,
+                    size_bytes: 2 * 1024 * 1024,
+                    line_bytes: 64,
+                    shared_cpu_ids: vec![0],
+                },
+                CpuCache {
+                    level: 3,
+                    cache_type: CacheType::Unified,
+                    size_bytes: 24 * 1024 * 1024,
+                    line_bytes: 64,
+                    shared_cpu_ids: (0..20).collect(),
+                },
+            ],
+            gpu: GpuSnapshot {
+                name: "NVIDIA GB10".to_owned(),
+                compute_major: 12,
+                compute_minor: 1,
+                l2_bytes: 24 * 1024 * 1024,
+                persisting_l2_max_bytes: 18 * 1024 * 1024,
+                total_memory_bytes: 128 * 1024 * 1024 * 1024,
+            },
+            mem_total_bytes: 128 * 1024 * 1024 * 1024,
+            page_size_bytes: 4096,
+        }
+    }
 
     #[test]
     fn rejects_x86_even_if_gpu_claims_sm121() {
-        let mut p = PlatformSnapshot::gb10_test_fixture();
+        let mut p = gb10_fixture();
         p.arch = "x86_64".into();
         assert!(matches!(
             validate_gb10(&p),
@@ -122,7 +157,7 @@ mod tests {
 
     #[test]
     fn rejects_non_121_compute_capability() {
-        let mut p = PlatformSnapshot::gb10_test_fixture();
+        let mut p = gb10_fixture();
         p.gpu.compute_major = 12;
         p.gpu.compute_minor = 0;
         assert!(matches!(
@@ -133,7 +168,7 @@ mod tests {
 
     #[test]
     fn accepts_exact_gb10_fixture() {
-        let p = PlatformSnapshot::gb10_test_fixture();
+        let p = gb10_fixture();
         let result = validate_gb10(&p).expect("GB10 fixture must validate");
         assert_eq!(result.compute_capability, (12, 1));
         assert!(result.discovered_l2_bytes > 0);
@@ -141,7 +176,7 @@ mod tests {
 
     #[test]
     fn rejects_impossible_persisting_l2_capacity() {
-        let mut p = PlatformSnapshot::gb10_test_fixture();
+        let mut p = gb10_fixture();
         p.gpu.persisting_l2_max_bytes = p.gpu.l2_bytes + 1;
         assert_eq!(
             validate_gb10(&p),
