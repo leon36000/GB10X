@@ -9,8 +9,7 @@ use std::path::{Component, Path};
 pub const QWEN38_FLASH_NEXT_MODEL_ID: &str = "Qwen/Qwen3.8-Flash-Next";
 
 /// Immutable source revision pinned by GB10X for the initial Qwen3.8-Flash-Next checkpoint.
-pub const QWEN38_FLASH_NEXT_REVISION: &str =
-    "34567a4712bc9766c4449e2e98e4468bfa24d915";
+pub const QWEN38_FLASH_NEXT_REVISION: &str = "34567a4712bc9766c4449e2e98e4468bfa24d915";
 
 /// Number of physical PLE tensor parts in the pinned checkpoint.
 pub const QWEN38_PLE_PARTS: usize = 128;
@@ -48,12 +47,12 @@ pub fn qwen38_ple_manifest_from_index(
     let bytes = fs::read(index_path)?;
     let root: Value = serde_json::from_slice(&bytes)
         .map_err(|_| PlePackIoError::Format("invalid model.safetensors.index.json"))?;
-    let weight_map = root
-        .get("weight_map")
-        .and_then(Value::as_object)
-        .ok_or(PlePackIoError::Format(
-            "safetensors index is missing weight_map object",
-        ))?;
+    let weight_map =
+        root.get("weight_map")
+            .and_then(Value::as_object)
+            .ok_or(PlePackIoError::Format(
+                "safetensors index is missing weight_map object",
+            ))?;
 
     let mut parts: Vec<Option<SafetensorsPlePart>> = vec![None; QWEN38_PLE_PARTS];
     for (tensor_name, mapped_file) in weight_map {
@@ -69,9 +68,9 @@ pub fn qwen38_ple_manifest_from_index(
                 "Qwen3.8 PLE shard index must be canonical decimal digits",
             ));
         }
-        let shard_index = shard_text.parse::<usize>().map_err(|_| {
-            PlePackIoError::Format("Qwen3.8 PLE shard index does not fit usize")
-        })?;
+        let shard_index = shard_text
+            .parse::<usize>()
+            .map_err(|_| PlePackIoError::Format("Qwen3.8 PLE shard index does not fit usize"))?;
         if shard_index >= QWEN38_PLE_PARTS || shard_text != shard_index.to_string() {
             return Err(PlePackIoError::Format(
                 "Qwen3.8 PLE shard index is out of range or noncanonical",
