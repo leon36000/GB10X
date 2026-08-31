@@ -226,8 +226,8 @@ impl Qwen38Config {
 
     /// Validate every immutable field GB10X bakes into its Qwen3.8 execution plan.
     pub fn validate_exact_contract(&self) -> Result<(), Qwen38ConfigError> {
-        expect_eq("model_type", &self.model_type, "qwen4_exp")?;
-        expect_eq("text model_type", &self.text_model_type, "qwen4_exp_text")?;
+        expect_str("model_type", &self.model_type, "qwen4_exp")?;
+        expect_str("text model_type", &self.text_model_type, "qwen4_exp_text")?;
         expect_usize("hidden_size", self.hidden_size, 2560)?;
         expect_usize("vocab_size", self.vocab_size, 248_320)?;
         expect_usize("num_hidden_layers", self.num_hidden_layers, 48)?;
@@ -284,7 +284,7 @@ impl Qwen38Config {
                 248_044_u32,
             ));
         }
-        expect_eq("output_gate_type", &self.output_gate_type, "sigmoid")?;
+        expect_str("output_gate_type", &self.output_gate_type, "sigmoid")?;
         expect_f64("rms_norm_eps", self.rms_norm_eps, 0.000001)?;
         expect_f64("rope_theta", self.rope_theta, 10_000_000.0)?;
         expect_usize("mtp_num_hidden_layers", self.mtp_num_hidden_layers, 1)?;
@@ -411,11 +411,8 @@ fn expect_f64(name: &str, actual: f64, expected: f64) -> Result<(), Qwen38Config
     }
 }
 
-fn expect_eq<T>(name: &str, actual: &T, expected: T) -> Result<(), Qwen38ConfigError>
-where
-    T: PartialEq + std::fmt::Display,
-{
-    if *actual == expected {
+fn expect_str(name: &str, actual: &str, expected: &str) -> Result<(), Qwen38ConfigError> {
+    if actual == expected {
         Ok(())
     } else {
         Err(contract_mismatch(name, actual, expected))
