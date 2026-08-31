@@ -236,6 +236,10 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/cache-topology")
     }
 
+    fn host_fixture_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/host-probe")
+    }
+
     #[test]
     fn parses_shared_cpu_list_ranges() {
         assert_eq!(
@@ -277,5 +281,33 @@ mod tests {
         assert_eq!(parse_cache_size("64K").unwrap(), 64 * 1024);
         assert_eq!(parse_cache_size("2M").unwrap(), 2 * 1024 * 1024);
         assert_eq!(parse_cache_size("4096").unwrap(), 4096);
+    }
+
+    #[test]
+    fn host_probe_fixture_preserves_discovered_facts() {
+        let root = host_fixture_root();
+        let probe = probe_host_from_paths(
+            &fixture_root(),
+            &root.join("online"),
+            &root.join("cpuinfo"),
+            &root.join("meminfo"),
+            "aarch64",
+            "6.11.0-gb10x-test",
+            4096,
+        )
+        .expect("host probe fixture");
+
+        assert_eq!(probe.arch, "aarch64");
+        assert_eq!(probe.kernel_release, "6.11.0-gb10x-test");
+        assert_eq!(probe.cpu_model, "NVIDIA Grace Blackwell GB10");
+        assert_eq!(probe.online_cpus, vec![0, 1, 2, 3]);
+        assert_eq!(probe.mem_total_bytes, 131_072_000 * 1024);
+        assert_eq!(probe.page_size_bytes, 4096);
+        assert!(!probe.caches.is_empty());
+    }
+
+    #[test]
+    fn meminfo_requires_memtotal() {
+        assert!(parse_mem_total_bytes("MemFree: 42 kB\n").is_err());
     }
 }
