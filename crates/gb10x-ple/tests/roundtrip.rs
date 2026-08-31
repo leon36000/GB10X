@@ -51,9 +51,13 @@ impl ExactPleRowSource for MemoryRows {
         let row = self
             .rows
             .get(logical_row as usize)
-            .ok_or(PlePackIoError::Source("logical row outside synthetic source"))?;
+            .ok_or(PlePackIoError::Source(
+                "logical row outside synthetic source",
+            ))?;
         if dst.len() != row.len() {
-            return Err(PlePackIoError::Source("synthetic row buffer width mismatch"));
+            return Err(PlePackIoError::Source(
+                "synthetic row buffer width mismatch",
+            ));
         }
         dst.copy_from_slice(row);
         Ok(())
@@ -98,7 +102,11 @@ fn corrupted_overlay_index_digest_is_rejected() {
     let report = PlePackWriter::write_overlay(&path, &source, &plan).unwrap();
     assert!(report.index_bytes > 0);
 
-    let mut file = OpenOptions::new().read(true).write(true).open(&path).unwrap();
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap();
     file.seek(SeekFrom::Start(report.index_offset)).unwrap();
     let mut byte = [0_u8; 1];
     file.read_exact(&mut byte).unwrap();
