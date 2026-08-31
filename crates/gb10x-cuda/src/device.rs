@@ -82,9 +82,7 @@ pub enum CudaDeviceInfoError {
     #[error("CUDA device-info field {0} must be nonzero")]
     ZeroGeometry(&'static str),
     /// Persisting-L2 capacity cannot exceed total L2 capacity.
-    #[error(
-        "persisting-L2 maximum {persisting_l2_max_bytes} exceeds L2 capacity {l2_bytes}"
-    )]
+    #[error("persisting-L2 maximum {persisting_l2_max_bytes} exceeds L2 capacity {l2_bytes}")]
     PersistingL2ExceedsL2 {
         /// Runtime-reported persisting-L2 maximum.
         persisting_l2_max_bytes: u64,
