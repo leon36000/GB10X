@@ -1,6 +1,7 @@
 use gb10x_telemetry::{
     CacheCounters, CacheRunState, CorrectnessGate, CpuPlacement, EvidenceError, EvidenceRecord,
-    ExecutionConfig, ExecutionMode, PerformanceMetrics, RunIdentity, StageTimings, WorkloadShape,
+    ExecutionConfig, ExecutionMode, HardwareState, PerformanceMetrics, RunIdentity, StageTimings,
+    WorkloadShape,
 };
 
 fn full_record() -> EvidenceRecord {
@@ -38,6 +39,7 @@ fn full_record() -> EvidenceRecord {
             decode_tokens_per_second: Some(42.0),
             ..PerformanceMetrics::default()
         },
+        hardware_state: HardwareState::default(),
         speculation: None,
         correctness: Some(CorrectnessGate::Passed {
             oracle: "target-greedy-reference".into(),
