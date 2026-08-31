@@ -1,4 +1,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![deny(missing_docs)]
 
-//! gb10x-runtime library.
+//! GB10-only runtime policy and host validation.
+
+mod validate;
+
+pub use validate::*;
