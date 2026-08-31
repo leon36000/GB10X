@@ -13,15 +13,8 @@ mod tests {
             offsets.push(next);
             next += *size;
         }
-        PleHashPlan::new(
-            vec![3, 5, 7],
-            vocab_sizes,
-            offsets,
-            8,
-            3,
-            EOS,
-        )
-        .expect("valid Qwen3.8-shaped PLE plan")
+        PleHashPlan::new(vec![3, 5, 7], vocab_sizes, offsets, 8, 3, EOS)
+            .expect("valid Qwen3.8-shaped PLE plan")
     }
 
     #[test]
