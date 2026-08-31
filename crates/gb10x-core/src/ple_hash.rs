@@ -79,9 +79,7 @@ impl PleHashPlan {
                 .checked_add(vocab_sizes[head - 1])
                 .ok_or(PleHashError::InvalidPlan("head table offset overflow"))?;
             if offsets[head] != expected {
-                return Err(PleHashError::InvalidPlan(
-                    "head tables must be contiguous",
-                ));
+                return Err(PleHashError::InvalidPlan("head tables must be contiguous"));
             }
         }
         let final_end = offsets[QWEN38_PLE_HEADS - 1]
@@ -130,8 +128,8 @@ impl PleHashPlan {
         for order in 2..=QWEN38_NGRAM_SIZE {
             let mut mixed = current.wrapping_mul(self.multipliers[0]);
             for previous in 1..order {
-                mixed ^= (window.previous[previous - 1] as u64)
-                    .wrapping_mul(self.multipliers[previous]);
+                mixed ^=
+                    (window.previous[previous - 1] as u64).wrapping_mul(self.multipliers[previous]);
             }
 
             let first_head = (order - 2) * QWEN38_HEADS_PER_ORDER;
@@ -189,9 +187,7 @@ impl PleTokenWindow {
     /// Commit all tokens staged since the current transaction began.
     pub fn commit_append(&mut self) -> Result<(), PleHashError> {
         if self.rollback.take().is_none() {
-            return Err(PleHashError::Transaction(
-                "no append transaction is active",
-            ));
+            return Err(PleHashError::Transaction("no append transaction is active"));
         }
         Ok(())
     }
@@ -201,9 +197,10 @@ impl PleTokenWindow {
     /// The method restores the pre-transaction state and replays only the accepted target prefix,
     /// guaranteeing that rejected draft suffixes leave no PLE history behind.
     pub fn commit_append_prefix(&mut self, accepted_tokens: &[u32]) -> Result<(), PleHashError> {
-        let original = self.rollback.take().ok_or(PleHashError::Transaction(
-            "no append transaction is active",
-        ))?;
+        let original = self
+            .rollback
+            .take()
+            .ok_or(PleHashError::Transaction("no append transaction is active"))?;
         self.previous = original;
         for &token in accepted_tokens {
             self.push(token);
@@ -213,9 +210,10 @@ impl PleTokenWindow {
 
     /// Abort the current speculative transaction and restore its exact starting state.
     pub fn abort_append(&mut self) -> Result<(), PleHashError> {
-        let original = self.rollback.take().ok_or(PleHashError::Transaction(
-            "no append transaction is active",
-        ))?;
+        let original = self
+            .rollback
+            .take()
+            .ok_or(PleHashError::Transaction("no append transaction is active"))?;
         self.previous = original;
         Ok(())
     }
