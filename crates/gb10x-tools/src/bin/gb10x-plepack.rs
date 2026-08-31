@@ -1,7 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use gb10x_ple::{
-    ExactPleRowSource, PlePackReader, PlePackWriter, RawFileRowSource,
-};
+use gb10x_ple::{ExactPleRowSource, PlePackReader, PlePackWriter, RawFileRowSource};
 use gb10x_tools::plepack::plan_from_trace_json;
 use serde_json::json;
 use std::fs;
@@ -96,12 +94,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 
 fn plan(args: PlanArgs) -> Result<(), Box<dyn std::error::Error>> {
     let trace = fs::read_to_string(args.trace)?;
-    let plan = plan_from_trace_json(
-        args.row_count,
-        args.row_bytes,
-        args.block_bytes,
-        &trace,
-    )?;
+    let plan = plan_from_trace_json(args.row_count, args.row_bytes, args.block_bytes, &trace)?;
     fs::write(args.out, serde_json::to_vec_pretty(&plan)?)?;
     Ok(())
 }
