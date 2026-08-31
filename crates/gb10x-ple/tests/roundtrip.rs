@@ -83,6 +83,7 @@ fn exact_overlay_roundtrips_every_logical_row() {
     assert!(reader.has_hot_overlay(3));
     assert!(reader.has_hot_overlay(11));
     assert!(!reader.has_hot_overlay(12));
+    assert_eq!(reader.verify_hot_overlay().unwrap(), 6);
 
     let mut output = vec![0_u8; 320];
     for logical_row in 0_u32..40 {
@@ -118,6 +119,35 @@ fn corrupted_overlay_index_digest_is_rejected() {
     assert!(matches!(
         PlePackReader::open(&path, source),
         Err(PlePackIoError::IndexDigestMismatch)
+    ));
+}
+
+#[test]
+fn corrupted_hot_overlay_data_is_detected_by_exact_verification() {
+    let source = MemoryRows::new(40, 320);
+    let plan = plan_exact_layout(40, 320, 4096, &trace()).unwrap();
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("corrupt-data.plepack");
+    let report = PlePackWriter::write_overlay(&path, &source, &plan).unwrap();
+    let data_offset = report.file_bytes - report.overlay_bytes;
+
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .unwrap();
+    file.seek(SeekFrom::Start(data_offset)).unwrap();
+    let mut byte = [0_u8; 1];
+    file.read_exact(&mut byte).unwrap();
+    byte[0] ^= 0x01;
+    file.seek(SeekFrom::Start(data_offset)).unwrap();
+    file.write_all(&byte).unwrap();
+    file.sync_all().unwrap();
+
+    let reader = PlePackReader::open(&path, source).expect("index is still structurally valid");
+    assert!(matches!(
+        reader.verify_hot_overlay(),
+        Err(PlePackIoError::OverlayDataMismatch { .. })
     ));
 }
 
