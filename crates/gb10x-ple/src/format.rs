@@ -64,6 +64,12 @@ pub enum PlePackIoError {
     /// Serialized hot-overlay index was modified or corrupted.
     #[error("PLEPack hot-overlay index digest mismatch")]
     IndexDigestMismatch,
+    /// A stored hot-overlay row differs byte-for-byte from the immutable exact source.
+    #[error("PLEPack hot-overlay row {logical_row} does not match exact source")]
+    OverlayDataMismatch {
+        /// Logical row whose stored overlay bytes differ from source.
+        logical_row: u32,
+    },
 }
 
 /// Immutable provenance and geometry for one exact PLEPack dataset.
