@@ -173,18 +173,18 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
             })
         })?;
         let row_len = self.header.row_bytes as usize;
-        let end = start.checked_add(row_len).ok_or(PlePackIoError::Format(
-            match context {
+        let end = start
+            .checked_add(row_len)
+            .ok_or(PlePackIoError::Format(match context {
                 "overlay verification" => "overlay verification slice end overflow",
                 _ => "overlay row slice end overflow",
-            },
-        ))?;
-        self.mmap.get(start..end).ok_or(PlePackIoError::Format(
-            match context {
+            }))?;
+        self.mmap
+            .get(start..end)
+            .ok_or(PlePackIoError::Format(match context {
                 "overlay verification" => "overlay verification row lies outside sidecar",
                 _ => "overlay row lies outside sidecar",
-            },
-        ))
+            }))
     }
 
     fn find_overlay_offset(&self, logical_row: u32) -> Result<Option<u64>, PlePackIoError> {
