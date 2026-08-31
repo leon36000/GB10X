@@ -3,6 +3,8 @@
 
 //! GB10-only CUDA build and native execution contracts.
 
+mod device;
 mod toolchain;
 
+pub use device::*;
 pub use toolchain::*;
