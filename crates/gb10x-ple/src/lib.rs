@@ -7,11 +7,13 @@ mod disk;
 mod format;
 mod layout;
 mod reader;
+mod safetensors;
 mod source;
 mod writer;
 
 pub use format::*;
 pub use layout::*;
 pub use reader::*;
+pub use safetensors::*;
 pub use source::*;
 pub use writer::*;
