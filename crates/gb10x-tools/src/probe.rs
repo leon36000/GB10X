@@ -1,8 +1,16 @@
+//! Thin host-probe CLI rendering helpers over the runtime probe types.
+
+use gb10x_runtime::linux_probe::HostProbe;
+
+/// Serialize one probed host snapshot as stable pretty-printed JSON.
+pub fn render_host_probe_json(probe: &HostProbe) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(probe)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use gb10x_core::{CacheType, CpuCache};
-    use gb10x_runtime::linux_probe::HostProbe;
 
     #[test]
     fn rendered_probe_preserves_cache_topology_and_architecture() {
