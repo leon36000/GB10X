@@ -6,6 +6,7 @@ members = [
   "crates/gb10x-ple",
   "crates/gb10x-telemetry",
   "crates/gb10x-tools",
+  "crates/gb10x-cuda",
 ]
 
 [workspace.package]
