@@ -39,13 +39,17 @@ impl RawFileRowSource {
     /// Open and validate a flat exact-row source.
     pub fn open(path: impl AsRef<Path>, row_bytes: u32) -> Result<Self, PlePackIoError> {
         if row_bytes == 0 {
-            return Err(PlePackIoError::Format("raw source row width must be nonzero"));
+            return Err(PlePackIoError::Format(
+                "raw source row width must be nonzero",
+            ));
         }
 
         let file = File::open(path)?;
         let file_bytes = file.metadata()?.len();
         if file_bytes == 0 {
-            return Err(PlePackIoError::Format("raw source must contain at least one row"));
+            return Err(PlePackIoError::Format(
+                "raw source must contain at least one row",
+            ));
         }
         if !file_bytes.is_multiple_of(row_bytes as u64) {
             return Err(PlePackIoError::Format(
@@ -112,10 +116,9 @@ impl ExactPleRowSource for RawFileRowSource {
         let end = start
             .checked_add(expected)
             .ok_or(PlePackIoError::Format("raw source row end overflow"))?;
-        let row = self
-            .mmap
-            .get(start..end)
-            .ok_or(PlePackIoError::Format("raw source row lies outside mapping"))?;
+        let row = self.mmap.get(start..end).ok_or(PlePackIoError::Format(
+            "raw source row lies outside mapping",
+        ))?;
         dst.copy_from_slice(row);
         Ok(())
     }
