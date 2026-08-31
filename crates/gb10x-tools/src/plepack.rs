@@ -1,3 +1,35 @@
+//! Thin PLEPack CLI helpers over the exact storage library.
+
+use gb10x_ple::{LayoutPlan, PlePackError, plan_exact_layout};
+use thiserror::Error;
+
+/// Failure while converting a JSON workload trace into an exact PLEPack layout plan.
+#[derive(Debug, Error)]
+pub enum PlanFromTraceError {
+    /// Workload trace JSON was malformed.
+    #[error("invalid PLEPack trace JSON: {0}")]
+    Json(#[from] serde_json::Error),
+    /// The decoded trace or requested geometry violated exact PLEPack constraints.
+    #[error(transparent)]
+    Layout(#[from] PlePackError),
+}
+
+/// Parse a JSON array-of-arrays trace and build the deterministic exact PLEPack layout.
+pub fn plan_from_trace_json(
+    row_count: u64,
+    row_bytes: u32,
+    block_bytes: u32,
+    trace_json: &str,
+) -> Result<LayoutPlan, PlanFromTraceError> {
+    let trace = serde_json::from_str::<Vec<Vec<u32>>>(trace_json)?;
+    Ok(plan_exact_layout(
+        row_count,
+        row_bytes,
+        block_bytes,
+        &trace,
+    )?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
