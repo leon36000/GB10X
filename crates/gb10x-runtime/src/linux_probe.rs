@@ -140,7 +140,9 @@ fn is_numbered_dir(path: &Path, prefix: &str) -> bool {
     path.file_name()
         .and_then(|name| name.to_str())
         .and_then(|name| name.strip_prefix(prefix))
-        .is_some_and(|suffix| !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit()))
+        .is_some_and(|suffix| {
+            !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit())
+        })
 }
 
 /// Read Linux sysfs CPU cache entries and return each physical cache object exactly once.
