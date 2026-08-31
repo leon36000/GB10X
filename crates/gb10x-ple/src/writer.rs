@@ -1,6 +1,6 @@
 //! Atomic exact hot-overlay PLEPack sidecar writer.
 
-use crate::disk::{encode_index_entry, DiskHeader, DISK_HEADER_BYTES, INDEX_ENTRY_BYTES};
+use crate::disk::{DISK_HEADER_BYTES, DiskHeader, INDEX_ENTRY_BYTES, encode_index_entry};
 use crate::{ExactPleRowSource, LayoutPlan, PlePackHeader, PlePackIoError};
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions};
@@ -119,9 +119,12 @@ impl PlePackWriter {
                     .checked_mul(plan.block_bytes() as u64)
                     .and_then(|base| base.checked_add(placement.offset_in_block as u64))
                     .ok_or(PlePackIoError::Format("hot overlay write offset overflow"))?;
-                let absolute = data_offset
-                    .checked_add(overlay_offset)
-                    .ok_or(PlePackIoError::Format("hot overlay absolute offset overflow"))?;
+                let absolute =
+                    data_offset
+                        .checked_add(overlay_offset)
+                        .ok_or(PlePackIoError::Format(
+                            "hot overlay absolute offset overflow",
+                        ))?;
                 file.seek(SeekFrom::Start(absolute))?;
                 file.write_all(&row)?;
             }
@@ -132,9 +135,8 @@ impl PlePackWriter {
             sync_parent_directory(path)?;
 
             Ok(PlePackWriteReport {
-                hot_rows: u64::try_from(index_entries.len()).map_err(|_| {
-                    PlePackIoError::Format("hot row count does not fit u64")
-                })?,
+                hot_rows: u64::try_from(index_entries.len())
+                    .map_err(|_| PlePackIoError::Format("hot row count does not fit u64"))?,
                 index_offset,
                 index_bytes,
                 overlay_bytes,
@@ -201,10 +203,7 @@ fn temporary_path(path: &Path) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or_default();
-    path.with_file_name(format!(
-        ".{file_name}.tmp-{}-{nonce}",
-        std::process::id()
-    ))
+    path.with_file_name(format!(".{file_name}.tmp-{}-{nonce}", std::process::id()))
 }
 
 fn sync_parent_directory(path: &Path) -> Result<(), PlePackIoError> {
