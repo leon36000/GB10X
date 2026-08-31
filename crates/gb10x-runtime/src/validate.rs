@@ -71,7 +71,9 @@ pub fn validate_gb10(snapshot: &PlatformSnapshot) -> Result<Gb10Validation, Plat
     if snapshot.caches.iter().any(|cache| {
         cache.size_bytes == 0 || cache.line_bytes == 0 || cache.shared_cpu_ids.is_empty()
     }) {
-        return Err(PlatformError::Incomplete("CPU cache entry contains zero/empty facts"));
+        return Err(PlatformError::Incomplete(
+            "CPU cache entry contains zero/empty facts",
+        ));
     }
     if snapshot.mem_total_bytes == 0 {
         return Err(PlatformError::Incomplete("host memory capacity is zero"));
@@ -83,7 +85,9 @@ pub fn validate_gb10(snapshot: &PlatformSnapshot) -> Result<Gb10Validation, Plat
         return Err(PlatformError::Incomplete("GPU L2 capacity is zero"));
     }
     if snapshot.gpu.total_memory_bytes == 0 {
-        return Err(PlatformError::Incomplete("GPU-visible memory capacity is zero"));
+        return Err(PlatformError::Incomplete(
+            "GPU-visible memory capacity is zero",
+        ));
     }
     if snapshot.gpu.persisting_l2_max_bytes > snapshot.gpu.l2_bytes {
         return Err(PlatformError::Incomplete(
