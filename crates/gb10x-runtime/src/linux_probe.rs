@@ -6,8 +6,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn fixture_root() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/fixtures/cache-topology")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/cache-topology")
     }
 
     #[test]
