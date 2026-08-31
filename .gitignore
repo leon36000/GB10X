@@ -1,0 +1,7 @@
+/target/
+*.plepack
+*.plepack.index
+*.tmp
+*.log
+.env
+.DS_Store

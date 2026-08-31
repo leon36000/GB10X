@@ -1,0 +1,18 @@
+[package]
+name = "gb10x-tools"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+gb10x-core = { path = "../gb10x-core" }
+gb10x-runtime = { path = "../gb10x-runtime" }
+gb10x-ple = { path = "../gb10x-ple" }
+gb10x-telemetry = { path = "../gb10x-telemetry" }
+clap.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
