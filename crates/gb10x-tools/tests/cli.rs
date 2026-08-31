@@ -26,6 +26,12 @@ fn probe_cli_has_help_json_and_rejects_unknown_flags() {
     let value: Value = serde_json::from_slice(&json.stdout).expect("valid probe JSON");
     assert!(value.get("arch").and_then(Value::as_str).is_some());
     assert!(value.get("caches").and_then(Value::as_array).is_some());
+    assert_eq!(value["cuda_native"]["state"], "unavailable");
+    assert_eq!(
+        value["cuda_native"]["reason"],
+        "binary built without native-cuda feature"
+    );
+    assert!(value["cuda_native"].get("device").is_none());
 
     let bad = probe().arg("--definitely-unknown").output().unwrap();
     assert!(!bad.status.success());
