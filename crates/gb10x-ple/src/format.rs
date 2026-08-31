@@ -35,6 +35,37 @@ pub enum PlePackError {
     Overflow(&'static str),
 }
 
+/// I/O or integrity failure while building or consuming an exact PLEPack sidecar.
+#[derive(Debug, Error)]
+pub enum PlePackIoError {
+    /// Layout/provenance geometry is invalid.
+    #[error(transparent)]
+    Layout(#[from] PlePackError),
+    /// Filesystem operation failed.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    /// On-disk structure is malformed or internally inconsistent.
+    #[error("invalid PLEPack sidecar: {0}")]
+    Format(&'static str),
+    /// Exact source provider rejected a request.
+    #[error("exact PLE source error: {0}")]
+    Source(&'static str),
+    /// Caller provided a row buffer of the wrong width.
+    #[error("row buffer width mismatch: expected {expected}, got {actual}")]
+    RowBufferWidth {
+        /// Exact source row width.
+        expected: usize,
+        /// Caller-provided buffer width.
+        actual: usize,
+    },
+    /// Sidecar was created against a different immutable source row stream.
+    #[error("PLEPack source digest does not match the exact source")]
+    SourceDigestMismatch,
+    /// Serialized hot-overlay index was modified or corrupted.
+    #[error("PLEPack hot-overlay index digest mismatch")]
+    IndexDigestMismatch,
+}
+
 /// Immutable provenance and geometry for one exact PLEPack dataset.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PlePackHeader {
