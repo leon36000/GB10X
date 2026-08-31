@@ -4,7 +4,7 @@ Status: host-independent bootstrap verified; real GB10/CUDA execution not yet ve
 
 ## Verification anchor
 
-Code commit verified by GitHub Actions: `2b8e1403b3e986c9819ad8953b346f5e6e777256`.
+Latest source-code anchor verified by GitHub Actions: `001d2f72b985f4bfc48d3df9e19286cd46012188`.
 
 Verification environment:
 - GitHub-hosted Ubuntu 24.04.x runner;
@@ -12,13 +12,14 @@ Verification environment:
 - Rust `1.98.0`;
 - no DGX Spark / GB10 hardware was used by this gate.
 
-Fresh CI gates on the verification anchor:
+Fresh CI gates on the source anchor:
 - `cargo fmt --all -- --check` — PASS;
 - `cargo test --workspace --all-targets` — PASS, zero failures;
 - `cargo clippy --workspace --all-targets -- -D warnings` — PASS;
-- `cargo build --workspace --release` — PASS.
+- `cargo build --workspace --release` — PASS;
+- GitGuardian secret scan — PASS.
 
-The CLI integration suite also executed the produced `gb10x-probe` and `gb10x-plepack` binaries. It verified help/argument handling, exact PLEPack build/verify, source-digest rejection after source mutation, and JSON output contracts.
+The CLI integration suite executes the produced `gb10x-probe` and `gb10x-plepack` binaries. It verifies help/argument handling, exact PLEPack build/verify, source-digest rejection after source mutation, and JSON output contracts.
 
 ## Host-independent behavior verified
 
@@ -31,7 +32,11 @@ The CLI integration suite also executed the produced `gb10x-probe` and `gb10x-pl
 - atomic PLEPack hot-overlay writer;
 - mmap PLEPack reader with source/index provenance validation;
 - byte-for-byte verification of every physically stored hot-overlay row against the immutable source;
-- strict telemetry/evidence record validation;
+- strict telemetry/evidence records are compiled and tested, not documentation-only;
+- every valid evidence record requires commit/model/hardware identity, exact command, runtime profile/config digest, CPU placement/isolation policy, precision/quantization mode, prefix/PLE/KV cache start state, workload shape, at least one performance measurement, and a correctness result;
+- exact and experimental-approximate modes are structurally separated;
+- invalid/non-finite performance values, malformed CPU placement, impossible cache counters and incomplete speculation evidence are rejected;
+- optional thermal/power/clock machine state is represented by typed fields;
 - `gb10x-probe --json` CLI contract;
 - `gb10x-plepack plan`, `build` and `verify` CLI contracts.
 
@@ -64,13 +69,13 @@ nvidia-smi
 nvcc --version
 ```
 
-Native CUDA work is unblocked only after the evidence confirms:
+Native CUDA work is hardware-verified only after evidence confirms:
 1. Linux `aarch64`;
 2. NVIDIA GB10 / DGX Spark target identity;
 3. CUDA Compute Capability 12.1 from a native CUDA-capable probe added in the native milestone;
 4. a usable CUDA toolkit on the server.
 
-Until that hardware gate exists, all CUDA/GB10-native claims remain `UNVERIFIED`.
+Until that hardware gate exists, all CUDA/GB10-native execution claims remain `UNVERIFIED`.
 
 ## Performance rule
 
