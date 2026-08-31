@@ -137,11 +137,9 @@ fn read_u32(bytes: &[u8], offset: usize) -> Result<u32, PlePackIoError> {
     let slice = bytes
         .get(offset..end)
         .ok_or(PlePackIoError::Format("truncated u32 header field"))?;
-    Ok(u32::from_le_bytes(
-        slice
-            .try_into()
-            .map_err(|_| PlePackIoError::Format("invalid u32 header field"))?,
-    ))
+    Ok(u32::from_le_bytes(slice.try_into().map_err(|_| {
+        PlePackIoError::Format("invalid u32 header field")
+    })?))
 }
 
 fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, PlePackIoError> {
@@ -151,9 +149,7 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, PlePackIoError> {
     let slice = bytes
         .get(offset..end)
         .ok_or(PlePackIoError::Format("truncated u64 header field"))?;
-    Ok(u64::from_le_bytes(
-        slice
-            .try_into()
-            .map_err(|_| PlePackIoError::Format("invalid u64 header field"))?,
-    ))
+    Ok(u64::from_le_bytes(slice.try_into().map_err(|_| {
+        PlePackIoError::Format("invalid u64 header field")
+    })?))
 }
