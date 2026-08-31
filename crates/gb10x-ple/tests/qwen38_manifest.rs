@@ -1,6 +1,6 @@
 use gb10x_ple::{
     QWEN38_FLASH_NEXT_MODEL_ID, QWEN38_FLASH_NEXT_REVISION, QWEN38_PLE_PARTS,
-    QWEN38_PLE_ROWS, QWEN38_PLE_ROWS_PER_PART, QWEN38_PLE_ROW_ELEMENTS,
+    QWEN38_PLE_ROW_ELEMENTS, QWEN38_PLE_ROWS, QWEN38_PLE_ROWS_PER_PART,
     qwen38_ple_manifest_from_index,
 };
 use serde_json::{Map, Value, json};
@@ -20,10 +20,7 @@ fn valid_weight_map() -> Map<String, Value> {
         .map(|index| {
             (
                 tensor_name(index),
-                Value::String(format!(
-                    "model-{:05}-of-00131.safetensors",
-                    5 + index / 4
-                )),
+                Value::String(format!("model-{:05}-of-00131.safetensors", 5 + index / 4)),
             )
         })
         .collect()
@@ -53,11 +50,17 @@ fn official_index_shape_builds_one_pinned_contiguous_manifest() {
     assert_eq!(manifest.model_revision, QWEN38_FLASH_NEXT_REVISION);
     assert_eq!(manifest.row_elements, QWEN38_PLE_ROW_ELEMENTS);
     assert_eq!(manifest.parts.len(), QWEN38_PLE_PARTS);
-    assert_eq!(QWEN38_PLE_ROWS_PER_PART * QWEN38_PLE_PARTS as u64, QWEN38_PLE_ROWS);
+    assert_eq!(
+        QWEN38_PLE_ROWS_PER_PART * QWEN38_PLE_PARTS as u64,
+        QWEN38_PLE_ROWS
+    );
 
     for (index, part) in manifest.parts.iter().enumerate() {
         assert_eq!(part.tensor_name, tensor_name(index));
-        assert_eq!(part.logical_row_start, index as u64 * QWEN38_PLE_ROWS_PER_PART);
+        assert_eq!(
+            part.logical_row_start,
+            index as u64 * QWEN38_PLE_ROWS_PER_PART
+        );
         assert_eq!(part.row_count, QWEN38_PLE_ROWS_PER_PART);
     }
     let last = manifest.parts.last().unwrap();
@@ -118,7 +121,10 @@ fn out_of_range_or_noncanonical_shard_names_are_rejected() {
 fn mapped_file_path_must_not_escape_model_directory() {
     let dir = tempdir().unwrap();
     let mut map = valid_weight_map();
-    map.insert(tensor_name(9), Value::String("../escape.safetensors".into()));
+    map.insert(
+        tensor_name(9),
+        Value::String("../escape.safetensors".into()),
+    );
     write_index(dir.path(), map);
     assert!(qwen38_ple_manifest_from_index(dir.path(), QWEN38_FLASH_NEXT_REVISION).is_err());
 }
