@@ -1,6 +1,6 @@
 //! mmap-backed exact PLEPack hot-overlay reader with cold-source fallback.
 
-use crate::disk::{DISK_HEADER_BYTES, INDEX_ENTRY_BYTES, DiskHeader, decode_index_entry};
+use crate::disk::{decode_index_entry, DiskHeader, DISK_HEADER_BYTES, INDEX_ENTRY_BYTES};
 use crate::{ExactPleRowSource, PlePackHeader, PlePackIoError};
 use memmap2::{Mmap, MmapOptions};
 use sha2::{Digest, Sha256};
@@ -190,7 +190,9 @@ fn validate_index(
 ) -> Result<(), PlePackIoError> {
     let expected_bytes = hot_row_count
         .checked_mul(INDEX_ENTRY_BYTES as usize)
-        .ok_or(PlePackIoError::Format("hot index validation size overflow"))?;
+        .ok_or(PlePackIoError::Format(
+            "hot index validation size overflow",
+        ))?;
     if index.len() != expected_bytes {
         return Err(PlePackIoError::Format(
             "hot index length does not match row count",
