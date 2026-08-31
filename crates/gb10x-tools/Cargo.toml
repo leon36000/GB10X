@@ -12,3 +12,4 @@ gb10x-ple = { path = "../gb10x-ple" }
 gb10x-telemetry = { path = "../gb10x-telemetry" }
 clap.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
