@@ -1,6 +1,6 @@
 //! Atomic exact hot-overlay PLEPack sidecar writer.
 
-use crate::disk::{DISK_HEADER_BYTES, INDEX_ENTRY_BYTES, DiskHeader, encode_index_entry};
+use crate::disk::{encode_index_entry, DiskHeader, DISK_HEADER_BYTES, INDEX_ENTRY_BYTES};
 use crate::{ExactPleRowSource, LayoutPlan, PlePackHeader, PlePackIoError};
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions};
@@ -132,8 +132,9 @@ impl PlePackWriter {
             sync_parent_directory(path)?;
 
             Ok(PlePackWriteReport {
-                hot_rows: u64::try_from(index_entries.len())
-                    .map_err(|_| PlePackIoError::Format("hot row count does not fit u64"))?,
+                hot_rows: u64::try_from(index_entries.len()).map_err(|_| {
+                    PlePackIoError::Format("hot row count does not fit u64")
+                })?,
                 index_offset,
                 index_bytes,
                 overlay_bytes,
