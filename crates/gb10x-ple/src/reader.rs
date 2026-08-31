@@ -1,6 +1,6 @@
 //! mmap-backed exact PLEPack hot-overlay reader with cold-source fallback.
 
-use crate::disk::{decode_index_entry, DiskHeader, DISK_HEADER_BYTES, INDEX_ENTRY_BYTES};
+use crate::disk::{DISK_HEADER_BYTES, DiskHeader, INDEX_ENTRY_BYTES, decode_index_entry};
 use crate::{ExactPleRowSource, PlePackHeader, PlePackIoError};
 use memmap2::{Mmap, MmapOptions};
 use sha2::{Digest, Sha256};
@@ -101,11 +101,7 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
     }
 
     /// Read one logical row exactly, preferring the mmap hot overlay and falling back to source.
-    pub fn read_exact_row(
-        &self,
-        logical_row: u32,
-        dst: &mut [u8],
-    ) -> Result<(), PlePackIoError> {
+    pub fn read_exact_row(&self, logical_row: u32, dst: &mut [u8]) -> Result<(), PlePackIoError> {
         if logical_row as u64 >= self.header.row_count {
             return Err(crate::PlePackError::LogicalRowOutOfRange {
                 row: logical_row,
@@ -132,7 +128,9 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
             }
             let absolute = (self.data_offset as u64)
                 .checked_add(overlay_offset)
-                .ok_or(PlePackIoError::Format("overlay absolute row offset overflow"))?;
+                .ok_or(PlePackIoError::Format(
+                    "overlay absolute row offset overflow",
+                ))?;
             let start = usize::try_from(absolute)
                 .map_err(|_| PlePackIoError::Format("overlay row offset does not fit usize"))?;
             let end = start
@@ -190,9 +188,7 @@ fn validate_index(
 ) -> Result<(), PlePackIoError> {
     let expected_bytes = hot_row_count
         .checked_mul(INDEX_ENTRY_BYTES as usize)
-        .ok_or(PlePackIoError::Format(
-            "hot index validation size overflow",
-        ))?;
+        .ok_or(PlePackIoError::Format("hot index validation size overflow"))?;
     if index.len() != expected_bytes {
         return Err(PlePackIoError::Format(
             "hot index length does not match row count",
