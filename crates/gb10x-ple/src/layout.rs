@@ -18,23 +18,31 @@ mod tests {
     }
 
     #[test]
-    fn every_logical_row_is_mapped_once() {
+    fn cold_base_region_maps_every_logical_row_without_an_index() {
         let plan = plan_exact_layout(40, 320, 4096, &trace()).expect("layout");
-        assert_eq!(plan.placements().len(), 40);
-        let rows = plan
-            .placements()
-            .iter()
-            .map(|placement| placement.logical_row)
-            .collect::<BTreeSet<_>>();
-        assert_eq!(rows.len(), 40);
-        assert_eq!(rows.first().copied(), Some(0));
-        assert_eq!(rows.last().copied(), Some(39));
+        assert_eq!(plan.base_row_count(), 40);
+        assert_eq!(plan.base_offset(0).unwrap(), 0);
+        assert_eq!(plan.base_offset(1).unwrap(), 320);
+        assert_eq!(plan.base_offset(39).unwrap(), 39 * 320);
+        assert!(plan.base_offset(40).is_err());
     }
 
     #[test]
-    fn no_row_crosses_block_boundary() {
+    fn hot_overlay_contains_each_observed_row_at_most_once() {
         let plan = plan_exact_layout(40, 320, 4096, &trace()).expect("layout");
-        for placement in plan.placements() {
+        let rows = plan
+            .hot_overlay_placements()
+            .iter()
+            .map(|placement| placement.logical_row)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(rows, BTreeSet::from([1, 2, 3, 7, 9, 11]));
+        assert_eq!(rows.len(), plan.hot_overlay_placements().len());
+    }
+
+    #[test]
+    fn no_hot_overlay_row_crosses_block_boundary() {
+        let plan = plan_exact_layout(40, 320, 4096, &trace()).expect("layout");
+        for placement in plan.hot_overlay_placements() {
             assert!(placement.offset_in_block as u64 + 320 <= 4096);
         }
     }
@@ -42,7 +50,7 @@ mod tests {
     #[test]
     fn first_observed_coaccess_group_is_physically_adjacent() {
         let plan = plan_exact_layout(40, 320, 4096, &trace()).expect("layout");
-        assert_eq!(&plan.physical_order()[..3], &[3, 7, 9]);
+        assert_eq!(&plan.hot_physical_order()[..3], &[3, 7, 9]);
     }
 
     #[test]
