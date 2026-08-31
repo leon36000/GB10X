@@ -16,6 +16,83 @@ pub enum ExecutionMode {
     },
 }
 
+/// Canonical cache state recorded at the start of a measured run.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheRunState {
+    /// Cache path is disabled for this run.
+    Disabled,
+    /// Cache path is enabled but intentionally starts empty/cold.
+    Cold,
+    /// Cache path is intentionally pre-populated before timing begins.
+    Warm,
+    /// Cache state is reused from a prior request/session by design.
+    Reused,
+}
+
+/// CPU placement/isolation policy used by the measured process.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CpuPlacement {
+    /// Threads were deliberately left unpinned; the reason must be recorded.
+    Unpinned {
+        /// Reason affinity was not applied.
+        reason: String,
+    },
+    /// Threads were constrained to the listed canonical CPU IDs.
+    Affinity {
+        /// Strictly increasing unique Linux CPU IDs.
+        cpus: Vec<u32>,
+    },
+    /// Threads ran on CPUs isolated by an explicit deployment profile.
+    Isolated {
+        /// Strictly increasing unique Linux CPU IDs.
+        cpus: Vec<u32>,
+        /// Named isolation/deployment profile used for the run.
+        profile: String,
+    },
+}
+
+/// Exact runtime configuration required to reproduce a measured execution path.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExecutionConfig {
+    /// Exact executable and argument vector after secret redaction, if any.
+    pub command: Vec<String>,
+    /// Named GB10X runtime/deployment profile.
+    pub runtime_profile: String,
+    /// Digest of the canonical runtime configuration payload.
+    pub runtime_config_digest: String,
+    /// CPU placement/isolation policy.
+    pub cpu_placement: CpuPlacement,
+    /// Compute precision label, for example `bf16`, `fp8` or `nvfp4`.
+    pub precision_mode: String,
+    /// Weight/activation quantization label; use `none` when no quantization is active.
+    pub quantization_mode: String,
+    /// Prefix-cache state at measurement start.
+    pub prefix_cache_state: CacheRunState,
+    /// PLE cache/overlay state at measurement start.
+    pub ple_cache_state: CacheRunState,
+    /// KV-cache state at measurement start.
+    pub kv_cache_state: CacheRunState,
+}
+
+/// Optional machine-state facts captured around a measured run.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct HardwareState {
+    /// GPU temperature in millidegrees Celsius, when available.
+    pub gpu_temperature_millicelsius: Option<u32>,
+    /// CPU temperature in millidegrees Celsius, when available.
+    pub cpu_temperature_millicelsius: Option<u32>,
+    /// Average measured system/device power in milliwatts, when available.
+    pub average_power_milliwatts: Option<u64>,
+    /// Configured power limit in milliwatts, when available.
+    pub power_limit_milliwatts: Option<u64>,
+    /// Measured GPU clock in hertz, when available.
+    pub gpu_clock_hz: Option<u64>,
+    /// Active CPU frequency-governor name, when available.
+    pub cpu_governor: Option<String>,
+}
+
 /// Immutable identity of one benchmark or correctness run.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RunIdentity {
@@ -153,6 +230,8 @@ pub enum CorrectnessGate {
 pub struct EvidenceRecord {
     /// Commit/model/hardware identity.
     pub identity: RunIdentity,
+    /// Exact runtime configuration and cache-start state.
+    pub execution: ExecutionConfig,
     /// Workload geometry.
     pub workload: WorkloadShape,
     /// Optional detailed stage timings.
@@ -161,6 +240,8 @@ pub struct EvidenceRecord {
     pub caches: CacheCounters,
     /// End-to-end performance metrics.
     pub performance: PerformanceMetrics,
+    /// Optional thermal/power/clock state captured around the run.
+    pub hardware_state: HardwareState,
     /// Speculation evidence when speculative execution was enabled.
     pub speculation: Option<SpeculationMetrics>,
     /// Mandatory correctness result.
@@ -196,6 +277,47 @@ impl EvidenceRecord {
             require_nonempty(label, "experimental_mode_label")?;
         }
 
+        self.validate_execution()?;
+        self.validate_workload()?;
+        self.validate_metrics()?;
+        self.validate_hardware_state()?;
+        self.validate_speculation()?;
+        self.validate_correctness()?;
+        Ok(())
+    }
+
+    fn validate_execution(&self) -> Result<(), EvidenceError> {
+        if self.execution.command.is_empty() {
+            return Err(EvidenceError::Missing("execution.command"));
+        }
+        if self.execution.command.iter().any(|arg| arg.is_empty()) {
+            return invalid("execution.command", "arguments must be nonempty strings");
+        }
+        require_nonempty(&self.execution.runtime_profile, "execution.runtime_profile")?;
+        require_nonempty(
+            &self.execution.runtime_config_digest,
+            "execution.runtime_config_digest",
+        )?;
+        require_nonempty(&self.execution.precision_mode, "execution.precision_mode")?;
+        require_nonempty(
+            &self.execution.quantization_mode,
+            "execution.quantization_mode",
+        )?;
+
+        match &self.execution.cpu_placement {
+            CpuPlacement::Unpinned { reason } => {
+                require_nonempty(reason, "execution.cpu_placement.reason")?;
+            }
+            CpuPlacement::Affinity { cpus } => validate_cpu_list(cpus)?,
+            CpuPlacement::Isolated { cpus, profile } => {
+                validate_cpu_list(cpus)?;
+                require_nonempty(profile, "execution.cpu_placement.profile")?;
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_workload(&self) -> Result<(), EvidenceError> {
         if self.workload.context_tokens == 0 {
             return invalid("context_tokens", "must be nonzero");
         }
@@ -211,7 +333,10 @@ impl EvidenceRecord {
         if self.workload.prompt_tokens > self.workload.context_tokens {
             return invalid("prompt_tokens", "cannot exceed context_tokens");
         }
+        Ok(())
+    }
 
+    fn validate_metrics(&self) -> Result<(), EvidenceError> {
         validate_positive_f64(
             self.performance.prefill_tokens_per_second,
             "prefill_tokens_per_second",
@@ -241,7 +366,29 @@ impl EvidenceRecord {
                 "cannot exceed prefetched row count",
             );
         }
+        Ok(())
+    }
 
+    fn validate_hardware_state(&self) -> Result<(), EvidenceError> {
+        validate_nonzero_u64(
+            self.hardware_state.average_power_milliwatts,
+            "hardware_state.average_power_milliwatts",
+        )?;
+        validate_nonzero_u64(
+            self.hardware_state.power_limit_milliwatts,
+            "hardware_state.power_limit_milliwatts",
+        )?;
+        validate_nonzero_u64(
+            self.hardware_state.gpu_clock_hz,
+            "hardware_state.gpu_clock_hz",
+        )?;
+        if let Some(governor) = &self.hardware_state.cpu_governor {
+            require_nonempty(governor, "hardware_state.cpu_governor")?;
+        }
+        Ok(())
+    }
+
+    fn validate_speculation(&self) -> Result<(), EvidenceError> {
         if let Some(speculation) = &self.speculation {
             require_nonempty(&speculation.strategy, "speculation.strategy")?;
             if speculation.proposed_tokens == 0 {
@@ -257,7 +404,10 @@ impl EvidenceRecord {
                 return invalid("speculation.verified_cycles", "must be nonzero");
             }
         }
+        Ok(())
+    }
 
+    fn validate_correctness(&self) -> Result<(), EvidenceError> {
         match self
             .correctness
             .as_ref()
@@ -284,7 +434,6 @@ impl EvidenceRecord {
                 }
             }
         }
-
         Ok(())
     }
 }
@@ -302,6 +451,19 @@ impl PerformanceMetrics {
     }
 }
 
+fn validate_cpu_list(cpus: &[u32]) -> Result<(), EvidenceError> {
+    if cpus.is_empty() {
+        return invalid("execution.cpu_placement", "CPU list must be nonempty");
+    }
+    if cpus.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return invalid(
+            "execution.cpu_placement",
+            "CPU IDs must be strictly increasing and unique",
+        );
+    }
+    Ok(())
+}
+
 fn require_nonempty(value: &str, field: &'static str) -> Result<(), EvidenceError> {
     if value.trim().is_empty() {
         Err(EvidenceError::Missing(field))
@@ -315,6 +477,13 @@ fn validate_positive_f64(value: Option<f64>, field: &'static str) -> Result<(), 
         && (!value.is_finite() || value <= 0.0)
     {
         return invalid(field, "must be finite and greater than zero");
+    }
+    Ok(())
+}
+
+fn validate_nonzero_u64(value: Option<u64>, field: &'static str) -> Result<(), EvidenceError> {
+    if value == Some(0) {
+        return invalid(field, "must be greater than zero when present");
     }
     Ok(())
 }
@@ -337,6 +506,19 @@ mod tests {
                 hardware: "NVIDIA GB10".into(),
                 mode: ExecutionMode::Exact,
             },
+            execution: ExecutionConfig {
+                command: vec!["gb10x-serve".into(), "--profile".into(), "exact".into()],
+                runtime_profile: "dedicated-server".into(),
+                runtime_config_digest: "sha256:runtime".into(),
+                cpu_placement: CpuPlacement::Affinity {
+                    cpus: vec![0, 1, 2, 3],
+                },
+                precision_mode: "bf16".into(),
+                quantization_mode: "none".into(),
+                prefix_cache_state: CacheRunState::Cold,
+                ple_cache_state: CacheRunState::Warm,
+                kv_cache_state: CacheRunState::Cold,
+            },
             workload: WorkloadShape {
                 context_tokens: 8192,
                 prompt_tokens: 2048,
@@ -355,6 +537,7 @@ mod tests {
                 power_watts: None,
                 tokens_per_joule: None,
             },
+            hardware_state: HardwareState::default(),
             speculation: None,
             correctness: Some(CorrectnessGate::Passed {
                 oracle: "target-greedy-reference".into(),
@@ -438,5 +621,21 @@ mod tests {
             reason: "token mismatch at position 12".into(),
         });
         assert!(record.validate().is_ok());
+    }
+
+    #[test]
+    fn unpinned_cpu_policy_requires_a_reason() {
+        let mut record = valid_record();
+        record.execution.cpu_placement = CpuPlacement::Unpinned {
+            reason: String::new(),
+        };
+        assert!(record.validate().is_err());
+    }
+
+    #[test]
+    fn hardware_state_rejects_zero_clock_when_present() {
+        let mut record = valid_record();
+        record.hardware_state.gpu_clock_hz = Some(0);
+        assert!(record.validate().is_err());
     }
 }
