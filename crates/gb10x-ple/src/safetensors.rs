@@ -128,18 +128,19 @@ impl SafetensorsPleSource {
                 ));
             }
 
-            let expected_tensor_bytes = part
-                .row_count
-                .checked_mul(row_bytes_u64)
-                .ok_or(PlePackIoError::Format(
-                    "PLE safetensors tensor byte length overflow",
-                ))?;
-            let actual_tensor_bytes = target
-                .data_end
-                .checked_sub(target.data_start)
-                .ok_or(PlePackIoError::Format(
-                    "safetensors tensor offsets are descending",
-                ))?;
+            let expected_tensor_bytes =
+                part.row_count
+                    .checked_mul(row_bytes_u64)
+                    .ok_or(PlePackIoError::Format(
+                        "PLE safetensors tensor byte length overflow",
+                    ))?;
+            let actual_tensor_bytes =
+                target
+                    .data_end
+                    .checked_sub(target.data_start)
+                    .ok_or(PlePackIoError::Format(
+                        "safetensors tensor offsets are descending",
+                    ))?;
             if actual_tensor_bytes != expected_tensor_bytes {
                 return Err(PlePackIoError::Format(
                     "PLE safetensors tensor byte length does not match shape",
@@ -166,12 +167,13 @@ impl SafetensorsPleSource {
             let data_start = usize::try_from(absolute_start_u64).map_err(|_| {
                 PlePackIoError::Format("safetensors tensor offset does not fit usize")
             })?;
-            let data_end = usize::try_from(absolute_end_u64).map_err(|_| {
-                PlePackIoError::Format("safetensors tensor end does not fit usize")
-            })?;
-            let tensor_bytes = mmap.get(data_start..data_end).ok_or(PlePackIoError::Format(
-                "safetensors tensor payload lies outside mapping",
-            ))?;
+            let data_end = usize::try_from(absolute_end_u64)
+                .map_err(|_| PlePackIoError::Format("safetensors tensor end does not fit usize"))?;
+            let tensor_bytes = mmap
+                .get(data_start..data_end)
+                .ok_or(PlePackIoError::Format(
+                    "safetensors tensor payload lies outside mapping",
+                ))?;
 
             digest_string(&mut hasher, &part.file)?;
             digest_string(&mut hasher, &part.tensor_name)?;
@@ -189,9 +191,9 @@ impl SafetensorsPleSource {
         }
 
         let row_count = manifest.parts.iter().try_fold(0_u64, |total, part| {
-            total.checked_add(part.row_count).ok_or(PlePackIoError::Format(
-                "safetensors PLE row count overflow",
-            ))
+            total
+                .checked_add(part.row_count)
+                .ok_or(PlePackIoError::Format("safetensors PLE row count overflow"))
         })?;
         if row_count > u32::MAX as u64 + 1 {
             return Err(PlePackError::InvalidGeometry(
@@ -250,14 +252,14 @@ impl ExactPleRowSource for SafetensorsPleSource {
                 "logical PLE row is not covered by mapped safetensors parts",
             ))?;
         let relative = logical - part.logical_row_start;
-        let byte_offset_u64 = relative
-            .checked_mul(u64::from(self.row_bytes))
-            .ok_or(PlePackIoError::Format(
-                "safetensors PLE row offset overflow",
-            ))?;
-        let byte_offset = usize::try_from(byte_offset_u64).map_err(|_| {
-            PlePackIoError::Format("safetensors PLE row offset does not fit usize")
-        })?;
+        let byte_offset_u64 =
+            relative
+                .checked_mul(u64::from(self.row_bytes))
+                .ok_or(PlePackIoError::Format(
+                    "safetensors PLE row offset overflow",
+                ))?;
+        let byte_offset = usize::try_from(byte_offset_u64)
+            .map_err(|_| PlePackIoError::Format("safetensors PLE row offset does not fit usize"))?;
         let start = part
             .data_start
             .checked_add(byte_offset)
@@ -266,9 +268,7 @@ impl ExactPleRowSource for SafetensorsPleSource {
             ))?;
         let end = start
             .checked_add(expected)
-            .ok_or(PlePackIoError::Format(
-                "safetensors PLE row end overflow",
-            ))?;
+            .ok_or(PlePackIoError::Format("safetensors PLE row end overflow"))?;
         if end > part.data_end {
             return Err(PlePackIoError::Format(
                 "safetensors PLE row exceeds tensor payload",
@@ -326,32 +326,37 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, PlePackIoError> {
             .ok_or(PlePackIoError::Format("invalid safetensors header range"))?,
     )
     .map_err(|_| PlePackIoError::Format("invalid safetensors header JSON"))?;
-    let object = header
-        .as_object()
-        .ok_or(PlePackIoError::Format("safetensors header must be a JSON object"))?;
+    let object = header.as_object().ok_or(PlePackIoError::Format(
+        "safetensors header must be a JSON object",
+    ))?;
 
-    let data_len = (bytes.len() as u64)
-        .checked_sub(data_section_start)
-        .ok_or(PlePackIoError::Format(
-            "safetensors data-section boundary is invalid",
-        ))?;
+    let data_len =
+        (bytes.len() as u64)
+            .checked_sub(data_section_start)
+            .ok_or(PlePackIoError::Format(
+                "safetensors data-section boundary is invalid",
+            ))?;
     let mut tensors = Vec::new();
     for (name, value) in object {
         if name == "__metadata__" {
             continue;
         }
-        let tensor = value
-            .as_object()
-            .ok_or(PlePackIoError::Format("safetensors tensor entry must be an object"))?;
+        let tensor = value.as_object().ok_or(PlePackIoError::Format(
+            "safetensors tensor entry must be an object",
+        ))?;
         let dtype = tensor
             .get("dtype")
             .and_then(Value::as_str)
-            .ok_or(PlePackIoError::Format("safetensors tensor dtype is missing"))?
+            .ok_or(PlePackIoError::Format(
+                "safetensors tensor dtype is missing",
+            ))?
             .to_owned();
         let shape = tensor
             .get("shape")
             .and_then(Value::as_array)
-            .ok_or(PlePackIoError::Format("safetensors tensor shape is missing"))?
+            .ok_or(PlePackIoError::Format(
+                "safetensors tensor shape is missing",
+            ))?
             .iter()
             .map(|dimension| {
                 dimension.as_u64().ok_or(PlePackIoError::Format(
@@ -359,23 +364,24 @@ fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, PlePackIoError> {
                 ))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let offsets = tensor
-            .get("data_offsets")
-            .and_then(Value::as_array)
-            .ok_or(PlePackIoError::Format(
-                "safetensors tensor data_offsets is missing",
-            ))?;
+        let offsets =
+            tensor
+                .get("data_offsets")
+                .and_then(Value::as_array)
+                .ok_or(PlePackIoError::Format(
+                    "safetensors tensor data_offsets is missing",
+                ))?;
         if offsets.len() != 2 {
             return Err(PlePackIoError::Format(
                 "safetensors tensor data_offsets must contain exactly two values",
             ));
         }
-        let data_start = offsets[0]
-            .as_u64()
-            .ok_or(PlePackIoError::Format("invalid safetensors tensor start offset"))?;
-        let data_end = offsets[1]
-            .as_u64()
-            .ok_or(PlePackIoError::Format("invalid safetensors tensor end offset"))?;
+        let data_start = offsets[0].as_u64().ok_or(PlePackIoError::Format(
+            "invalid safetensors tensor start offset",
+        ))?;
+        let data_end = offsets[1].as_u64().ok_or(PlePackIoError::Format(
+            "invalid safetensors tensor end offset",
+        ))?;
         if data_end < data_start {
             return Err(PlePackIoError::Format(
                 "safetensors tensor offsets are descending",
@@ -443,9 +449,7 @@ fn validate_manifest(manifest: &SafetensorsPleManifest) -> Result<(), PlePackIoE
             return Err(PlePackIoError::Format("PLE manifest part file is empty"));
         }
         if part.tensor_name.trim().is_empty() {
-            return Err(PlePackIoError::Format(
-                "PLE manifest tensor name is empty",
-            ));
+            return Err(PlePackIoError::Format("PLE manifest tensor name is empty"));
         }
         safe_relative_path(&part.file)?;
         if part.row_count == 0 {
