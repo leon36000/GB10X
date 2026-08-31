@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/gb10x-core",
+  "crates/gb10x-runtime",
+  "crates/gb10x-ple",
+  "crates/gb10x-telemetry",
+  "crates/gb10x-tools",
+]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/leon36000/GB10X"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+libc = "0.2"
+memmap2 = "0.9"
+clap = { version = "4", features = ["derive"] }
+tempfile = "3"
+proptest = "1"
+hex = "0.4"
