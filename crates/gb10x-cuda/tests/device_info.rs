@@ -1,4 +1,4 @@
-use gb10x_cuda::{CudaDeviceInfo, CudaDeviceInfoRawV1, CudaDeviceInfoError};
+use gb10x_cuda::{CudaDeviceInfo, CudaDeviceInfoError, CudaDeviceInfoRawV1};
 
 const NAME_BYTES: usize = 256;
 
@@ -50,7 +50,10 @@ fn compute_capability_other_than_12_1_is_rejected() {
     raw.compute_minor = 0;
     assert!(matches!(
         CudaDeviceInfo::try_from(raw),
-        Err(CudaDeviceInfoError::ComputeCapability { major: 12, minor: 0 })
+        Err(CudaDeviceInfoError::ComputeCapability {
+            major: 12,
+            minor: 0
+        })
     ));
 }
 
