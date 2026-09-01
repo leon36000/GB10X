@@ -86,6 +86,13 @@ jobs:
           printf '%s\n' "$output"
           test "$status" -ne 0
           grep -Fq "requires Linux aarch64" <<<"$output"
+      - name: Native verifier guards environment before build isolation
+        run: |
+          guard_line=$(grep -nF 'bash scripts/check-gb10-build-env.sh "$repo_root"' scripts/verify-gb10-m2.sh | cut -d: -f1)
+          target_line=$(grep -nF 'native_target_dir="$(mktemp -d' scripts/verify-gb10-m2.sh | cut -d: -f1)
+          test -n "$guard_line"
+          test -n "$target_line"
+          test "$guard_line" -lt "$target_line"
       - name: Native verifier isolates build artifacts
         run: |
           grep -Fq 'native_target_dir="$(mktemp -d' scripts/verify-gb10-m2.sh
