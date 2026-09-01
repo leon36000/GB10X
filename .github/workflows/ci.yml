@@ -30,6 +30,51 @@ jobs:
           cargo metadata --locked --format-version 1 >/dev/null
       - name: Rustfmt
         run: cargo fmt --all -- --check
+      - name: Native build environment guard
+        run: |
+          guard='scripts/check-gb10-build-env.sh'
+          bash "$guard" "$PWD"
+
+          set +e
+          output=$(RUSTFLAGS='-Ctarget-cpu=native' bash "$guard" "$PWD" 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -ne 0
+          grep -Fq 'RUSTFLAGS' <<<"$output"
+
+          mkdir -p .cargo
+          printf '[build]\nrustflags = ["-Ctarget-cpu=native"]\n' > .cargo/config.toml
+          set +e
+          output=$(bash "$guard" "$PWD" 2>&1)
+          status=$?
+          set -e
+          rm -rf .cargo
+          printf '%s\n' "$output"
+          test "$status" -ne 0
+          grep -Fq 'untracked Cargo config' <<<"$output"
+
+          mkdir -p ../.cargo
+          printf '[build]\nrustflags = ["-Ctarget-cpu=native"]\n' > ../.cargo/config.toml
+          set +e
+          output=$(bash "$guard" "$PWD" 2>&1)
+          status=$?
+          set -e
+          rm -rf ../.cargo
+          printf '%s\n' "$output"
+          test "$status" -ne 0
+          grep -Fq 'inherited Cargo config' <<<"$output"
+
+          temp_cargo_home=$(mktemp -d)
+          printf '[build]\nrustflags = ["-Ctarget-cpu=native"]\n' > "$temp_cargo_home/config.toml"
+          set +e
+          output=$(CARGO_HOME="$temp_cargo_home" bash "$guard" "$PWD" 2>&1)
+          status=$?
+          set -e
+          rm -rf "$temp_cargo_home"
+          printf '%s\n' "$output"
+          test "$status" -ne 0
+          grep -Fq 'CARGO_HOME config' <<<"$output"
       - name: Native verification script syntax
         run: bash -n scripts/verify-gb10-m2.sh
       - name: Native verification script rejects x86 CI
