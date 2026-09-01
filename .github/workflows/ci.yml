@@ -25,6 +25,17 @@ jobs:
           components: rustfmt, clippy
       - name: Rustfmt
         run: cargo fmt --all -- --check
+      - name: Native verification script syntax
+        run: bash -n scripts/verify-gb10-m2.sh
+      - name: Native verification script rejects x86 CI
+        run: |
+          set +e
+          output=$(bash scripts/verify-gb10-m2.sh 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          test "$status" -ne 0
+          grep -Fq "requires Linux aarch64" <<<"$output"
       - name: Unit tests
         run: cargo test --workspace --all-targets
       - name: Clippy
