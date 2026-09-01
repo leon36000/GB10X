@@ -36,6 +36,12 @@ jobs:
           printf '%s\n' "$output"
           test "$status" -ne 0
           grep -Fq "requires Linux aarch64" <<<"$output"
+      - name: Native verifier isolates build artifacts
+        run: |
+          grep -Fq 'native_target_dir="$(mktemp -d' scripts/verify-gb10-m2.sh
+          grep -Fq 'export CARGO_TARGET_DIR="$native_target_dir"' scripts/verify-gb10-m2.sh
+          grep -Fq 'find "$CARGO_TARGET_DIR/debug/build"' scripts/verify-gb10-m2.sh
+          grep -Fq 'trap cleanup_native_target EXIT' scripts/verify-gb10-m2.sh
       - name: Unit tests
         run: cargo test --workspace --all-targets
       - name: Clippy
