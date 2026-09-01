@@ -12,7 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  actions: read
+  contents: write
 
 jobs:
   rust-host-logic:
@@ -23,14 +24,26 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Generate lockfile candidate
-        run: cargo generate-lockfile
-      - uses: actions/upload-artifact@v4
+      - name: Download exact lockfile candidate from RED run
+        uses: actions/download-artifact@v4
         with:
-          name: cargo-lock-${{ github.sha }}
-          path: Cargo.lock
-          if-no-files-found: error
-      - name: Cargo lockfile is committed
+          name: cargo-lock-b646052124066a1a9b185f960c78e94a62a8be88
+          path: .
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 33457743386
+      - name: Verify and commit exact lockfile
+        run: |
+          echo '9233c5fcc1a039ff377ac7895e30258aec61e0ed6302cfef7eb8d272472f8c8a  Cargo.lock' | sha256sum -c -
+          if git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1; then
+            echo 'Cargo.lock is already tracked; refusing one-shot materialization on an unexpected state.' >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          git commit -m 'build: lock M2 Rust dependency graph'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Cargo lockfile is committed and valid
         run: |
           git ls-files --error-unmatch Cargo.lock
           git diff --exit-code -- Cargo.lock
@@ -62,11 +75,11 @@ jobs:
           grep -Fq 'model-source.json' scripts/verify-gb10-m2.sh
           grep -Fq '"model_source": json.loads(model_source_path.read_text' scripts/verify-gb10-m2.sh
       - name: Unit tests
-        run: cargo test --workspace --all-targets
+        run: cargo test --locked --workspace --all-targets
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Release build
-        run: cargo build --workspace --release
+        run: cargo build --locked --workspace --release
 
   cuda-sm121a-compile:
     name: CUDA 12.9 sm_121a compile-only gate
