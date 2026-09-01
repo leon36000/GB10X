@@ -16,7 +16,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
 cd "$repo_root"
 
-for command_name in git cargo rustc nvcc nvidia-smi cuobjdump python3 tee find; do
+for command_name in git cargo rustc nvcc nvidia-smi cuobjdump python3 tee find mktemp rm; do
   command -v "$command_name" >/dev/null 2>&1 || fail "required command is missing: ${command_name}"
 done
 
@@ -30,11 +30,23 @@ short_sha="$(git rev-parse --short=12 HEAD)"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 evidence_dir="${GB10X_M2_EVIDENCE_DIR:-${repo_root}/docs/evidence/native-runs/${timestamp}-${short_sha}}"
 mkdir -p "$evidence_dir"
+
+# Build in a fresh target tree so artifact inspection cannot accidentally select an object produced
+# by an older commit or an earlier local experiment. The target tree is disposable; raw evidence is
+# written separately under evidence_dir and survives cleanup.
+native_target_dir="$(mktemp -d "${TMPDIR:-/tmp}/gb10x-m2-target.XXXXXX")"
+cleanup_native_target() {
+  rm -rf -- "$native_target_dir"
+}
+trap cleanup_native_target EXIT
+export CARGO_TARGET_DIR="$native_target_dir"
+
 exec > >(tee -a "${evidence_dir}/verification.log") 2>&1
 
 printf 'GB10X M2 native verification\n'
 printf 'git_sha=%s\n' "$git_sha"
 printf 'evidence_dir=%s\n' "$evidence_dir"
+printf 'isolated_cargo_target=%s\n' "$CARGO_TARGET_DIR"
 
 uname -a | tee "${evidence_dir}/uname.txt"
 rustc --version | tee "${evidence_dir}/rustc.txt"
@@ -105,10 +117,11 @@ artifact_log="${evidence_dir}/cuobjdump.txt"
 : > "$artifact_log"
 for object_name in probe.o smoke.o rmsnorm.o; do
   mapfile -t candidates < <(
-    find target/debug/build -type f -path "*/gb10x-cuda-*/out/${object_name}" -print
+    find "$CARGO_TARGET_DIR/debug/build" -type f -path "*/gb10x-cuda-*/out/${object_name}" -print
   )
-  (( ${#candidates[@]} > 0 )) || fail "could not locate compiled CUDA object ${object_name}"
-  object_path="${candidates[${#candidates[@]}-1]}"
+  (( ${#candidates[@]} == 1 )) || fail \
+    "expected exactly one isolated CUDA object ${object_name}, found ${#candidates[@]}"
+  object_path="${candidates[0]}"
   printf '\n## %s\n' "$object_path" | tee -a "$artifact_log"
   cuobjdump --list-elf "$object_path" 2>&1 | tee -a "$artifact_log"
 done
