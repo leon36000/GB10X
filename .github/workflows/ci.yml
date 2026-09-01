@@ -28,6 +28,14 @@ jobs:
           git ls-files --error-unmatch Cargo.lock
           git diff --exit-code -- Cargo.lock
           cargo metadata --locked --format-version 1 >/dev/null
+      - name: Rust and CI provenance are pinned
+        run: |
+          grep -Fq 'channel = "1.98.0"' rust-toolchain.toml
+          grep -Fq 'rust-version = "1.98.0"' Cargo.toml
+          test "$(grep -Fc 'runs-on: ubuntu-24.04' .github/workflows/ci.yml)" -eq 2
+          test "$(grep -Fc 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' .github/workflows/ci.yml)" -eq 2
+          test "$(grep -Fc 'dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c' .github/workflows/ci.yml)" -eq 2
+          test "$(grep -Fc 'toolchain: 1.98.0' .github/workflows/ci.yml)" -eq 2
       - name: Rustfmt
         run: cargo fmt --all -- --check
       - name: Native build environment guard
@@ -132,6 +140,8 @@ jobs:
           rm -rf /var/lib/apt/lists/*
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - name: Record CUDA compiler
         run: nvcc --version
       - name: Compile native CUDA probe without executing a GPU
