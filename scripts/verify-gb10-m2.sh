@@ -6,11 +6,44 @@ fail() {
   exit 64
 }
 
+usage() {
+  cat <<'EOF'
+Usage: verify-gb10-m2.sh --model-dir PATH
+
+Run the fail-closed M2 correctness/evidence gate on the real DGX Spark.
+The Qwen model directory may alternatively be supplied through GB10X_QWEN_MODEL_DIR.
+EOF
+}
+
 kernel="$(uname -s)"
 arch="$(uname -m)"
 if [[ "$kernel" != "Linux" || "$arch" != "aarch64" ]]; then
   fail "requires Linux aarch64 on the real DGX Spark; found ${kernel} ${arch}"
 fi
+
+model_dir="${GB10X_QWEN_MODEL_DIR:-}"
+while (( $# > 0 )); do
+  case "$1" in
+    --model-dir)
+      shift
+      (( $# > 0 )) || fail "--model-dir requires a path"
+      model_dir="$1"
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "unknown argument: $1"
+      ;;
+  esac
+  shift
+done
+
+[[ -n "$model_dir" ]] || fail \
+  "requires --model-dir PATH or GB10X_QWEN_MODEL_DIR for the pinned Qwen checkpoint"
+[[ -d "$model_dir" ]] || fail "Qwen model directory does not exist: ${model_dir}"
+model_dir="$(cd -- "$model_dir" && pwd -P)" || fail "cannot resolve Qwen model directory"
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
@@ -47,6 +80,7 @@ printf 'GB10X M2 native verification\n'
 printf 'git_sha=%s\n' "$git_sha"
 printf 'evidence_dir=%s\n' "$evidence_dir"
 printf 'isolated_cargo_target=%s\n' "$CARGO_TARGET_DIR"
+printf 'qwen_model_dir=%s\n' "$model_dir"
 
 uname -a | tee "${evidence_dir}/uname.txt"
 rustc --version | tee "${evidence_dir}/rustc.txt"
@@ -65,6 +99,36 @@ if (( nvcc_major < 12 || (nvcc_major == 12 && nvcc_minor < 9) )); then
 fi
 
 nvidia-smi | tee "${evidence_dir}/nvidia-smi.txt"
+
+model_source_json="$(cargo run -p gb10x-tools --bin gb10x-plepack -- source-verify --model-dir "$model_dir")"
+printf '%s\n' "$model_source_json" | tee "${evidence_dir}/model-source.json"
+
+python3 - "${evidence_dir}/model-source.json" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text(encoding="utf-8"))
+if data.get("state") != "verified-local-bytes":
+    raise SystemExit(f"Qwen local-byte verification did not pass: {data!r}")
+if data.get("model_id") != "Qwen/Qwen3.8-Flash-Next":
+    raise SystemExit(f"unexpected Qwen model id: {data.get('model_id')!r}")
+if data.get("revision_contract") != "34567a4712bc9766c4449e2e98e4468bfa24d915":
+    raise SystemExit(f"unexpected Qwen revision contract: {data.get('revision_contract')!r}")
+if data.get("parts") != 128:
+    raise SystemExit(f"unexpected PLE part count: {data.get('parts')!r}")
+if data.get("row_count") != 320_001_536:
+    raise SystemExit(f"unexpected PLE row count: {data.get('row_count')!r}")
+if data.get("row_bytes") != 320:
+    raise SystemExit(f"unexpected PLE row width: {data.get('row_bytes')!r}")
+digest = data.get("source_digest_sha256")
+if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+    raise SystemExit(f"invalid local PLE source digest: {digest!r}")
+if data.get("remote_digest_match") is not None:
+    raise SystemExit("source verifier must not fabricate a remote digest match")
+PY
 
 probe_json="$(cargo run -p gb10x-tools --features native-cuda --bin gb10x-probe -- --json)"
 printf '%s\n' "$probe_json" | tee "${evidence_dir}/probe.json"
@@ -126,21 +190,23 @@ for object_name in probe.o smoke.o rmsnorm.o; do
   cuobjdump --list-elf "$object_path" 2>&1 | tee -a "$artifact_log"
 done
 
-python3 - "${evidence_dir}/probe.json" "${evidence_dir}/summary.json" \
-  "$git_sha" "$timestamp" "${nvcc_major}.${nvcc_minor}" <<'PY'
+python3 - "${evidence_dir}/probe.json" "${evidence_dir}/model-source.json" \
+  "${evidence_dir}/summary.json" "$git_sha" "$timestamp" "${nvcc_major}.${nvcc_minor}" <<'PY'
 import json
 import pathlib
 import sys
 
 probe_path = pathlib.Path(sys.argv[1])
-summary_path = pathlib.Path(sys.argv[2])
+model_source_path = pathlib.Path(sys.argv[2])
+summary_path = pathlib.Path(sys.argv[3])
 summary = {
     "schema_version": 1,
     "result": "pass",
     "proof_class": "gb10-device-execution",
-    "git_sha": sys.argv[3],
-    "timestamp_utc": sys.argv[4],
-    "nvcc_release": sys.argv[5],
+    "git_sha": sys.argv[4],
+    "timestamp_utc": sys.argv[5],
+    "nvcc_release": sys.argv[6],
+    "model_source": json.loads(model_source_path.read_text(encoding="utf-8")),
     "probe": json.loads(probe_path.read_text(encoding="utf-8")),
     "native_tests": {
         "device_probe": "pass",
@@ -162,6 +228,7 @@ cat > "${evidence_dir}/summary.md" <<EOF
 - UTC timestamp: \`${timestamp}\`
 - Host: Linux \`aarch64\`
 - CUDA compiler: \`${nvcc_major}.${nvcc_minor}\` or newer patch level as recorded in \`nvcc.txt\`
+- Pinned Qwen local PLE bytes: PASS (observed local digest recorded; remote digest match is not claimed)
 - Native probe / GB10 validation: PASS
 - CUDA smoke checksum: PASS
 - BF16 RMSNorm correctness gate: PASS
