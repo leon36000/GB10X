@@ -29,9 +29,7 @@ fn oracle(input: &[u16], weight: &[u16]) -> Vec<u16> {
         .iter()
         .zip(weight)
         .map(|(&input_bits, &weight_bits)| {
-            bf16_from_f32(
-                f32_from_bf16(input_bits) * inverse_rms * f32_from_bf16(weight_bits),
-            )
+            bf16_from_f32(f32_from_bf16(input_bits) * inverse_rms * f32_from_bf16(weight_bits))
         })
         .collect()
 }
