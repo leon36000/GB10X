@@ -3,7 +3,7 @@
 use gb10x_core::{CacheType, CpuCache};
 use gb10x_cuda::CudaDeviceInfo;
 use gb10x_runtime::linux_probe::HostProbe;
-use gb10x_runtime::validate::validate_gb10;
+use gb10x_runtime::validate_gb10;
 use gb10x_tools::probe::{gpu_snapshot_from_cuda, render_native_probe_json};
 use serde_json::Value;
 
