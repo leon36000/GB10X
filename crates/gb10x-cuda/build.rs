@@ -33,7 +33,10 @@ fn main() {
     let archive = out_dir.join("libgb10x_cuda_native.a");
     let mut objects = Vec::new();
 
-    for (source, object_name) in [("native/probe.cu", "probe.o"), ("native/smoke.cu", "smoke.o")] {
+    for (source, object_name) in [
+        ("native/probe.cu", "probe.o"),
+        ("native/smoke.cu", "smoke.o"),
+    ] {
         let object = out_dir.join(object_name);
         let mut compile = Command::new(&nvcc);
         compile
