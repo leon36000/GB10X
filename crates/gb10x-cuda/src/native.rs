@@ -94,9 +94,8 @@ pub unsafe fn rmsnorm_bf16_device(
 ) -> Result<(), CudaNativeError> {
     // SAFETY: the caller upholds the device-pointer validity contract documented above. The C ABI
     // performs no host dereference of those pointers and synchronizes the launched kernel.
-    let status = unsafe {
-        gb10x_cuda_rmsnorm_bf16_device_v1(input_device, weight_device, output_device)
-    };
+    let status =
+        unsafe { gb10x_cuda_rmsnorm_bf16_device_v1(input_device, weight_device, output_device) };
     if status != 0 {
         return Err(CudaNativeError::NativeStatus(status));
     }
@@ -123,11 +122,7 @@ pub fn rmsnorm_bf16_host_for_test(
     // SAFETY: the slices above were validated to contain exactly one full row, and `output` owns
     // writable storage for the same number of BF16 storage values for the duration of the call.
     let status = unsafe {
-        gb10x_cuda_rmsnorm_bf16_host_test_v1(
-            input.as_ptr(),
-            weight.as_ptr(),
-            output.as_mut_ptr(),
-        )
+        gb10x_cuda_rmsnorm_bf16_host_test_v1(input.as_ptr(), weight.as_ptr(), output.as_mut_ptr())
     };
     if status != 0 {
         return Err(CudaNativeError::NativeStatus(status));
