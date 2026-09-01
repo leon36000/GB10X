@@ -31,3 +31,22 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Release build
         run: cargo build --workspace --release
+
+  cuda-sm121a-compile:
+    name: CUDA 12.9 sm_121a compile-only gate
+    runs-on: ubuntu-latest
+    container:
+      image: nvidia/cuda:12.9.1-devel-ubuntu24.04@sha256:020bc241a628776338f4d4053fed4c38f6f7f3d7eb5919fecb8de313bb8ba47c
+    steps:
+      - name: Bootstrap CUDA build container
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl git
+          rm -rf /var/lib/apt/lists/*
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Record CUDA compiler
+        run: nvcc --version
+      - name: Compile native CUDA tests without executing a GPU
+        run: cargo test -p gb10x-cuda --features native-cuda --all-targets --no-run
