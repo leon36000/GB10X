@@ -45,6 +45,19 @@ fn plepack_cli_has_help() {
     assert!(text.contains("Usage:"));
     assert!(text.contains("build"));
     assert!(text.contains("verify"));
+    assert!(text.contains("source-verify"));
+}
+
+#[test]
+fn plepack_source_verify_fails_closed_without_pinned_index() {
+    let dir = tempdir().unwrap();
+    let output = plepack()
+        .args(["source-verify", "--model-dir"])
+        .arg(dir.path())
+        .output()
+        .expect("source-verify invocation");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("model.safetensors.index.json"));
 }
 
 #[test]
