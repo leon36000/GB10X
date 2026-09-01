@@ -42,6 +42,13 @@ jobs:
           grep -Fq 'export CARGO_TARGET_DIR="$native_target_dir"' scripts/verify-gb10-m2.sh
           grep -Fq 'find "$CARGO_TARGET_DIR/debug/build"' scripts/verify-gb10-m2.sh
           grep -Fq 'trap cleanup_native_target EXIT' scripts/verify-gb10-m2.sh
+      - name: Native verifier binds pinned Qwen source bytes
+        run: |
+          grep -Fq 'model_dir="${GB10X_QWEN_MODEL_DIR:-}"' scripts/verify-gb10-m2.sh
+          grep -Fq -- '--model-dir)' scripts/verify-gb10-m2.sh
+          grep -Fq 'source-verify --model-dir "$model_dir"' scripts/verify-gb10-m2.sh
+          grep -Fq 'model-source.json' scripts/verify-gb10-m2.sh
+          grep -Fq '"model_source": json.loads(model_source_path.read_text' scripts/verify-gb10-m2.sh
       - name: Unit tests
         run: cargo test --workspace --all-targets
       - name: Clippy
