@@ -48,5 +48,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Record CUDA compiler
         run: nvcc --version
-      - name: Compile native CUDA tests without executing a GPU
+      - name: Compile native CUDA probe without executing a GPU
         run: cargo test -p gb10x-cuda --features native-cuda --all-targets --no-run
+      - name: Verify native probe JSON contract without executing CUDA
+        run: cargo test -p gb10x-tools --features native-cuda --test native_probe_json
+      - name: Compile native tooling without executing a GPU
+        run: cargo test -p gb10x-tools --features native-cuda --all-targets --no-run

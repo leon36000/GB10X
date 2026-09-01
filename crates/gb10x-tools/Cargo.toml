@@ -5,11 +5,16 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = []
+native-cuda = ["dep:gb10x-cuda", "gb10x-cuda/native-cuda"]
+
 [dependencies]
 gb10x-core = { path = "../gb10x-core" }
 gb10x-runtime = { path = "../gb10x-runtime" }
 gb10x-ple = { path = "../gb10x-ple" }
 gb10x-telemetry = { path = "../gb10x-telemetry" }
+gb10x-cuda = { path = "../gb10x-cuda", optional = true }
 clap.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
