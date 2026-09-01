@@ -7,6 +7,7 @@ fn main() {
     println!("cargo:rerun-if-changed=native/gb10x_cuda.h");
     println!("cargo:rerun-if-changed=native/probe.cu");
     println!("cargo:rerun-if-changed=native/smoke.cu");
+    println!("cargo:rerun-if-changed=native/rmsnorm.cu");
     println!("cargo:rerun-if-env-changed=NVCC");
     println!("cargo:rerun-if-env-changed=AR");
     println!("cargo:rerun-if-env-changed=CUDA_HOME");
@@ -36,6 +37,7 @@ fn main() {
     for (source, object_name) in [
         ("native/probe.cu", "probe.o"),
         ("native/smoke.cu", "smoke.o"),
+        ("native/rmsnorm.cu", "rmsnorm.o"),
     ] {
         let object = out_dir.join(object_name);
         let mut compile = Command::new(&nvcc);

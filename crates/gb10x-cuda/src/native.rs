@@ -4,9 +4,21 @@ use crate::{CudaDeviceInfo, CudaDeviceInfoError, CudaDeviceInfoRawV1};
 use std::mem::MaybeUninit;
 use thiserror::Error;
 
+const RMSNORM_WIDTH: usize = 2560;
+
 unsafe extern "C" {
     fn gb10x_cuda_probe_device(ordinal: i32, out: *mut CudaDeviceInfoRawV1) -> i32;
     fn gb10x_cuda_smoke_v1(elements: u64, checksum: *mut u64) -> i32;
+    fn gb10x_cuda_rmsnorm_bf16_device_v1(
+        input_device: *const u16,
+        weight_device: *const u16,
+        output_device: *mut u16,
+    ) -> i32;
+    fn gb10x_cuda_rmsnorm_bf16_host_test_v1(
+        input_host: *const u16,
+        weight_host: *const u16,
+        output_host: *mut u16,
+    ) -> i32;
 }
 
 /// Failure while invoking or validating a native CUDA operation.
@@ -18,6 +30,16 @@ pub enum CudaNativeError {
     /// Native bytes were returned, but they violated the GB10 device contract.
     #[error(transparent)]
     DeviceInfo(#[from] CudaDeviceInfoError),
+    /// A host-side RMSNorm test vector did not match the fixed Qwen width.
+    #[error("RMSNorm {field} length must be {expected}, found {actual}")]
+    RmsNormLength {
+        /// Vector whose length was invalid.
+        field: &'static str,
+        /// Fixed Qwen hidden width required by this kernel.
+        expected: usize,
+        /// Caller-provided vector length.
+        actual: usize,
+    },
 }
 
 /// Probe one CUDA device through the native CUDA Runtime bridge and validate it as GB10.
@@ -53,4 +75,62 @@ pub fn run_smoke(elements: u64) -> Result<u64, CudaNativeError> {
         return Err(CudaNativeError::NativeStatus(status));
     }
     Ok(checksum)
+}
+
+/// Execute one fixed-width BF16 RMSNorm row using caller-owned CUDA device buffers.
+///
+/// The input, weight and output buffers each contain exactly 2560 BF16 values represented by their
+/// 16-bit storage bits. Accumulation is FP32 and epsilon is fixed to `1e-6`.
+///
+/// # Safety
+///
+/// `input_device` and `weight_device` must each point to at least 2560 readable BF16 values in CUDA
+/// device memory, and `output_device` must point to at least 2560 writable BF16 values in CUDA
+/// device memory. The buffers must remain valid until this synchronous call returns.
+pub unsafe fn rmsnorm_bf16_device(
+    input_device: *const u16,
+    weight_device: *const u16,
+    output_device: *mut u16,
+) -> Result<(), CudaNativeError> {
+    // SAFETY: the caller upholds the device-pointer validity contract documented above. The C ABI
+    // performs no host dereference of those pointers and synchronizes the launched kernel.
+    let status = unsafe {
+        gb10x_cuda_rmsnorm_bf16_device_v1(input_device, weight_device, output_device)
+    };
+    if status != 0 {
+        return Err(CudaNativeError::NativeStatus(status));
+    }
+    Ok(())
+}
+
+/// Test-only convenience path that copies one BF16 row through real CUDA device memory.
+#[doc(hidden)]
+pub fn rmsnorm_bf16_host_for_test(
+    input: &[u16],
+    weight: &[u16],
+) -> Result<Vec<u16>, CudaNativeError> {
+    for (field, actual) in [("input", input.len()), ("weight", weight.len())] {
+        if actual != RMSNORM_WIDTH {
+            return Err(CudaNativeError::RmsNormLength {
+                field,
+                expected: RMSNORM_WIDTH,
+                actual,
+            });
+        }
+    }
+
+    let mut output = vec![0_u16; RMSNORM_WIDTH];
+    // SAFETY: the slices above were validated to contain exactly one full row, and `output` owns
+    // writable storage for the same number of BF16 storage values for the duration of the call.
+    let status = unsafe {
+        gb10x_cuda_rmsnorm_bf16_host_test_v1(
+            input.as_ptr(),
+            weight.as_ptr(),
+            output.as_mut_ptr(),
+        )
+    };
+    if status != 0 {
+        return Err(CudaNativeError::NativeStatus(status));
+    }
+    Ok(output)
 }

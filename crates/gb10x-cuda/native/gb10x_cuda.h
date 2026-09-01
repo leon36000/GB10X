@@ -25,6 +25,12 @@ typedef struct gb10x_cuda_device_info_v1 {
 
 int gb10x_cuda_probe_device(int ordinal, gb10x_cuda_device_info_v1* out);
 int gb10x_cuda_smoke_v1(uint64_t elements, uint64_t* checksum);
+int gb10x_cuda_rmsnorm_bf16_device_v1(const uint16_t* input_device,
+                                       const uint16_t* weight_device,
+                                       uint16_t* output_device);
+int gb10x_cuda_rmsnorm_bf16_host_test_v1(const uint16_t* input_host,
+                                          const uint16_t* weight_host,
+                                          uint16_t* output_host);
 
 #ifdef __cplusplus
 }
