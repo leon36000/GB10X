@@ -57,6 +57,8 @@ done
 # intentionally allowed, but tracked source/index modifications are not.
 git diff --quiet || fail "tracked worktree changes are present"
 git diff --cached --quiet || fail "staged source changes are present"
+git ls-files --error-unmatch Cargo.lock >/dev/null 2>&1 || fail "tracked Cargo.lock is missing"
+cargo metadata --locked --format-version 1 >/dev/null || fail "Cargo.lock does not match the workspace"
 
 git_sha="$(git rev-parse HEAD)"
 short_sha="$(git rev-parse --short=12 HEAD)"
@@ -100,7 +102,7 @@ fi
 
 nvidia-smi | tee "${evidence_dir}/nvidia-smi.txt"
 
-model_source_json="$(cargo run -p gb10x-tools --bin gb10x-plepack -- source-verify --model-dir "$model_dir")"
+model_source_json="$(cargo run --locked -p gb10x-tools --bin gb10x-plepack -- source-verify --model-dir "$model_dir")"
 printf '%s\n' "$model_source_json" | tee "${evidence_dir}/model-source.json"
 
 python3 - "${evidence_dir}/model-source.json" <<'PY'
@@ -130,7 +132,7 @@ if data.get("remote_digest_match") is not None:
     raise SystemExit("source verifier must not fabricate a remote digest match")
 PY
 
-probe_json="$(cargo run -p gb10x-tools --features native-cuda --bin gb10x-probe -- --json)"
+probe_json="$(cargo run --locked -p gb10x-tools --features native-cuda --bin gb10x-probe -- --json)"
 printf '%s\n' "$probe_json" | tee "${evidence_dir}/probe.json"
 
 python3 - "${evidence_dir}/probe.json" <<'PY'
@@ -170,11 +172,11 @@ if not isinstance(validation, dict) or validation.get("state") != "passed":
     raise SystemExit(f"GB10 validation did not pass: {validation!r}")
 PY
 
-cargo test -p gb10x-cuda --features native-cuda --test native_probe -- --nocapture \
+cargo test --locked -p gb10x-cuda --features native-cuda --test native_probe -- --nocapture \
   2>&1 | tee "${evidence_dir}/native-probe-test.txt"
-cargo test -p gb10x-cuda --features native-cuda --test native_smoke -- --nocapture \
+cargo test --locked -p gb10x-cuda --features native-cuda --test native_smoke -- --nocapture \
   2>&1 | tee "${evidence_dir}/native-smoke-test.txt"
-cargo test -p gb10x-cuda --features native-cuda --test rmsnorm -- --nocapture \
+cargo test --locked -p gb10x-cuda --features native-cuda --test rmsnorm -- --nocapture \
   2>&1 | tee "${evidence_dir}/rmsnorm-test.txt"
 
 artifact_log="${evidence_dir}/cuobjdump.txt"
