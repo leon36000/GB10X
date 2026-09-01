@@ -53,6 +53,9 @@ for command_name in git cargo rustc nvcc nvidia-smi cuobjdump python3 tee find m
   command -v "$command_name" >/dev/null 2>&1 || fail "required command is missing: ${command_name}"
 done
 
+# Reject ambient Cargo/Rust/CUDA build overrides before GB10X creates its own isolated target tree.
+build_env_guard_output="$(bash scripts/check-gb10-build-env.sh "$repo_root")"
+
 # Evidence must bind to an exact tracked source state. Generated/untracked evidence directories are
 # intentionally allowed, but tracked source/index modifications are not.
 git diff --quiet || fail "tracked worktree changes are present"
@@ -83,6 +86,7 @@ printf 'git_sha=%s\n' "$git_sha"
 printf 'evidence_dir=%s\n' "$evidence_dir"
 printf 'isolated_cargo_target=%s\n' "$CARGO_TARGET_DIR"
 printf 'qwen_model_dir=%s\n' "$model_dir"
+printf '%s\n' "$build_env_guard_output" | tee "${evidence_dir}/build-env.txt"
 
 uname -a | tee "${evidence_dir}/uname.txt"
 rustc --version | tee "${evidence_dir}/rustc.txt"
