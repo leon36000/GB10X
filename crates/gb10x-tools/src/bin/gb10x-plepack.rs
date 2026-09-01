@@ -1,7 +1,11 @@
 use clap::{Args, Parser, Subcommand};
-use gb10x_ple::{ExactPleRowSource, PlePackReader, PlePackWriter, RawFileRowSource};
+use gb10x_ple::{
+    ExactPleRowSource, PlePackReader, PlePackWriter, QWEN38_FLASH_NEXT_REVISION,
+    RawFileRowSource, SafetensorsPleSource, qwen38_ple_manifest_from_index,
+};
 use gb10x_tools::plepack::plan_from_trace_json;
 use serde_json::json;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
@@ -23,6 +27,8 @@ enum Command {
     Build(BuildArgs),
     /// Verify every stored hot row byte-for-byte against its immutable source.
     Verify(VerifyArgs),
+    /// Validate and hash the pinned Qwen PLE tensors directly from safetensors.
+    SourceVerify(SourceVerifyArgs),
 }
 
 #[derive(Debug, Args)]
@@ -76,6 +82,13 @@ struct VerifyArgs {
     row_bytes: u32,
 }
 
+#[derive(Debug, Args)]
+struct SourceVerifyArgs {
+    /// Directory containing the pinned Qwen checkpoint and model.safetensors.index.json.
+    #[arg(long)]
+    model_dir: PathBuf,
+}
+
 fn main() {
     let cli = Cli::parse();
     if let Err(error) = run(cli) {
@@ -89,6 +102,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Command::Plan(args) => plan(args),
         Command::Build(args) => build(args),
         Command::Verify(args) => verify(args),
+        Command::SourceVerify(args) => source_verify(args),
     }
 }
 
@@ -142,4 +156,43 @@ fn verify(args: VerifyArgs) -> Result<(), Box<dyn std::error::Error>> {
         }))?
     );
     Ok(())
+}
+
+fn source_verify(args: SourceVerifyArgs) -> Result<(), Box<dyn std::error::Error>> {
+    let index_path = args.model_dir.join("model.safetensors.index.json");
+    if !index_path.is_file() {
+        return Err(format!(
+            "pinned Qwen source is missing model.safetensors.index.json at {}",
+            index_path.display()
+        )
+        .into());
+    }
+
+    let manifest = qwen38_ple_manifest_from_index(&args.model_dir, QWEN38_FLASH_NEXT_REVISION)?;
+    let source = SafetensorsPleSource::open(&args.model_dir, &manifest)?;
+    let digest = digest_hex(source.source_digest());
+
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&json!({
+            "state": "verified-local-bytes",
+            "model_id": manifest.model_id,
+            "revision_contract": manifest.model_revision,
+            "parts": manifest.parts.len(),
+            "row_count": source.row_count(),
+            "row_bytes": source.row_bytes(),
+            "source_digest_sha256": digest,
+            "digest_scope": "GB10X-SAFETENSORS-PLE-V1 manifest+referenced-PLE-bytes",
+            "remote_digest_match": null,
+        }))?
+    );
+    Ok(())
+}
+
+fn digest_hex(digest: [u8; 32]) -> String {
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
 }
