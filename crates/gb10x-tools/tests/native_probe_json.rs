@@ -48,10 +48,7 @@ fn native_json_uses_cuda_device_facts_and_reports_validation() {
     assert_eq!((gpu.compute_major, gpu.compute_minor), (12, 1));
     assert_eq!(gpu.total_memory_bytes, device.total_memory_bytes);
     assert_eq!(gpu.l2_bytes, device.l2_bytes);
-    assert_eq!(
-        gpu.persisting_l2_max_bytes,
-        device.persisting_l2_max_bytes
-    );
+    assert_eq!(gpu.persisting_l2_max_bytes, device.persisting_l2_max_bytes);
 
     let snapshot = host.clone().into_platform_snapshot(gpu);
     let validation = validate_gb10(&snapshot).expect("synthetic GB10 facts must validate");
@@ -63,10 +60,7 @@ fn native_json_uses_cuda_device_facts_and_reports_validation() {
     assert_eq!(json["cuda_native"]["device"]["name"], "NVIDIA GB10");
     assert_eq!(json["cuda_native"]["device"]["compute_major"], 12);
     assert_eq!(json["cuda_native"]["device"]["compute_minor"], 1);
-    assert_eq!(
-        json["cuda_native"]["device"]["l2_bytes"],
-        device.l2_bytes
-    );
+    assert_eq!(json["cuda_native"]["device"]["l2_bytes"], device.l2_bytes);
     assert_eq!(json["cuda_native"]["validation"]["state"], "passed");
     assert_eq!(
         json["cuda_native"]["validation"]["discovered_l2_bytes"],
