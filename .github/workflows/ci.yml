@@ -23,6 +23,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Generate lockfile candidate
+        run: cargo generate-lockfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock-${{ github.sha }}
+          path: Cargo.lock
+          if-no-files-found: error
+      - name: Cargo lockfile is committed
+        run: |
+          git ls-files --error-unmatch Cargo.lock
+          git diff --exit-code -- Cargo.lock
+          cargo metadata --locked --format-version 1 >/dev/null
       - name: Rustfmt
         run: cargo fmt --all -- --check
       - name: Native verification script syntax
