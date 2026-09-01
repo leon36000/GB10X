@@ -6,6 +6,7 @@ use std::process::{Command, Output};
 fn main() {
     println!("cargo:rerun-if-changed=native/gb10x_cuda.h");
     println!("cargo:rerun-if-changed=native/probe.cu");
+    println!("cargo:rerun-if-changed=native/smoke.cu");
     println!("cargo:rerun-if-env-changed=NVCC");
     println!("cargo:rerun-if-env-changed=AR");
     println!("cargo:rerun-if-env-changed=CUDA_HOME");
@@ -29,32 +30,39 @@ fn main() {
     validate_nvcc_version(&version_output);
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo must provide OUT_DIR"));
-    let object = out_dir.join("probe.o");
     let archive = out_dir.join("libgb10x_cuda_native.a");
+    let mut objects = Vec::new();
 
-    let mut compile = Command::new(&nvcc);
-    compile
-        .arg("-std=c++17")
-        .arg("-Xcompiler")
-        .arg("-fPIC")
-        .arg("--generate-code=arch=compute_121a,code=sm_121a")
-        .arg("-I")
-        .arg("native")
-        .arg("-c")
-        .arg("native/probe.cu")
-        .arg("-o")
-        .arg(&object);
-    run_checked(
-        &mut compile,
-        "nvcc failed to compile the GB10X sm_121a native probe",
-    );
+    for (source, object_name) in [("native/probe.cu", "probe.o"), ("native/smoke.cu", "smoke.o")] {
+        let object = out_dir.join(object_name);
+        let mut compile = Command::new(&nvcc);
+        compile
+            .arg("-std=c++17")
+            .arg("-Xcompiler")
+            .arg("-fPIC")
+            .arg("--generate-code=arch=compute_121a,code=sm_121a")
+            .arg("-I")
+            .arg("native")
+            .arg("-c")
+            .arg(source)
+            .arg("-o")
+            .arg(&object);
+        run_checked(
+            &mut compile,
+            &format!("nvcc failed to compile GB10X sm_121a source {source}"),
+        );
+        objects.push(object);
+    }
 
     let ar = env::var_os("AR").unwrap_or_else(|| OsString::from("ar"));
     let mut archive_command = Command::new(&ar);
-    archive_command.arg("crs").arg(&archive).arg(&object);
+    archive_command.arg("crs").arg(&archive);
+    for object in &objects {
+        archive_command.arg(object);
+    }
     run_checked(
         &mut archive_command,
-        "failed to archive the GB10X native CUDA object",
+        "failed to archive the GB10X native CUDA objects",
     );
 
     let cuda_home = env::var_os("CUDA_HOME")

@@ -6,13 +6,14 @@ use thiserror::Error;
 
 unsafe extern "C" {
     fn gb10x_cuda_probe_device(ordinal: i32, out: *mut CudaDeviceInfoRawV1) -> i32;
+    fn gb10x_cuda_smoke_v1(elements: u64, checksum: *mut u64) -> i32;
 }
 
-/// Failure while invoking or validating the native CUDA device probe.
+/// Failure while invoking or validating a native CUDA operation.
 #[derive(Debug, Error)]
 pub enum CudaNativeError {
     /// The native C ABI returned a nonzero status code.
-    #[error("native CUDA probe returned status {0}")]
+    #[error("native CUDA operation returned status {0}")]
     NativeStatus(i32),
     /// Native bytes were returned, but they violated the GB10 device contract.
     #[error(transparent)]
@@ -37,4 +38,19 @@ pub fn probe_device(ordinal: i32) -> Result<CudaDeviceInfo, CudaNativeError> {
     // has been initialized. Rust still validates all semantic invariants before exposing the data.
     let raw = unsafe { raw.assume_init() };
     Ok(CudaDeviceInfo::try_from(raw)?)
+}
+
+/// Execute the deterministic GB10 CUDA smoke kernel and return its 64-bit wrapping checksum.
+///
+/// The native operation allocates and fills device memory, reads it through a separate reduction
+/// kernel, and copies only the compact checksum back to the host.
+pub fn run_smoke(elements: u64) -> Result<u64, CudaNativeError> {
+    let mut checksum = 0_u64;
+    // SAFETY: `checksum` is valid writable storage for the stable C ABI output. The native function
+    // writes it only on success; Rust exposes the value only after a zero status is returned.
+    let status = unsafe { gb10x_cuda_smoke_v1(elements, &mut checksum) };
+    if status != 0 {
+        return Err(CudaNativeError::NativeStatus(status));
+    }
+    Ok(checksum)
 }

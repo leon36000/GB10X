@@ -24,6 +24,7 @@ typedef struct gb10x_cuda_device_info_v1 {
 } gb10x_cuda_device_info_v1;
 
 int gb10x_cuda_probe_device(int ordinal, gb10x_cuda_device_info_v1* out);
+int gb10x_cuda_smoke_v1(uint64_t elements, uint64_t* checksum);
 
 #ifdef __cplusplus
 }
