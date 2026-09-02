@@ -102,7 +102,9 @@ arguments. The implementation then supplies exactly:
 to both CUDA compilation and any CUDA device-link phase. This creates a real
 `sm_121a` image and intentionally emits no PTX code image. CMake must reject a
 nonempty `CMAKE_CUDA_ARCHITECTURES` value other than `OFF`, plus any
-architecture-selection option supplied through `CMAKE_CUDA_FLAGS`.
+architecture-selection option supplied through `CMAKE_CUDA_FLAGS`, its
+configuration-specific variants, `CMAKE_CUDA_FLAGS_INIT`, or the `CUDAFLAGS`
+environment variable before CUDA language enablement.
 
 `native`, `all`, `all-major`, `--gpu-architecture`, `--gpu-code`, and extra
 `--generate-code` selections are prohibited in project configuration. This is
