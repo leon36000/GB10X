@@ -12,7 +12,11 @@ fn abi_info_has_the_fixed_v1_layout() {
     assert_eq!(offset_of!(CudaAbiInfo, struct_size), 0);
     assert_eq!(offset_of!(CudaAbiInfo, abi_version), 4);
     assert_eq!(offset_of!(CudaAbiInfo, target_sm_major), 8);
+    assert_eq!(offset_of!(CudaAbiInfo, target_sm_minor), 12);
+    assert_eq!(offset_of!(CudaAbiInfo, target_sm_variant), 16);
+    assert_eq!(offset_of!(CudaAbiInfo, cuda_runtime_header_version), 20);
     assert_eq!(offset_of!(CudaAbiInfo, cuda_runtime_loaded_version), 24);
+    assert_eq!(offset_of!(CudaAbiInfo, reserved0), 28);
 }
 
 #[test]
@@ -20,6 +24,9 @@ fn device_info_has_the_fixed_v1_layout() {
     assert_eq!(size_of::<CudaDeviceInfo>(), 296);
     assert_eq!(align_of::<CudaDeviceInfo>(), 8);
     assert_eq!(offset_of!(CudaDeviceInfo, struct_size), 0);
+    assert_eq!(offset_of!(CudaDeviceInfo, device_ordinal), 4);
+    assert_eq!(offset_of!(CudaDeviceInfo, compute_major), 8);
+    assert_eq!(offset_of!(CudaDeviceInfo, compute_minor), 12);
     assert_eq!(offset_of!(CudaDeviceInfo, total_global_memory_bytes), 16);
     assert_eq!(offset_of!(CudaDeviceInfo, l2_cache_bytes), 24);
     assert_eq!(offset_of!(CudaDeviceInfo, persisting_l2_max_bytes), 32);
