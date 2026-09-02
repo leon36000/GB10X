@@ -1,4 +1,5 @@
 /target/
+/build/
 *.plepack
 *.plepack.index
 *.tmp
