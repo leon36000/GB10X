@@ -135,10 +135,13 @@ function(gb10x_apply_cuda_target_contract target)
         "${target}"
         PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:${GB10X_CUDA_CODEGEN_FLAG}>"
     )
-    target_link_options(
-        "${target}"
-        PRIVATE "$<DEVICE_LINK:${GB10X_CUDA_CODEGEN_FLAG}>"
-    )
+    get_target_property(gb10x_target_type "${target}" TYPE)
+    if(NOT gb10x_target_type STREQUAL "STATIC_LIBRARY")
+        target_link_options(
+            "${target}"
+            PRIVATE "$<DEVICE_LINK:${GB10X_CUDA_CODEGEN_FLAG}>"
+        )
+    endif()
 endfunction()
 
 add_library(gb10x_cuda STATIC common/src/gb10x_cuda_abi.cu)
