@@ -40,16 +40,48 @@ if(
         "GB10X requires CMAKE_CUDA_ARCHITECTURES to be empty or OFF"
     )
 endif()
-if(
-    DEFINED CMAKE_CUDA_FLAGS
-    AND CMAKE_CUDA_FLAGS MATCHES
-        "(^|[ \t])(--gpu-architecture|--gpu-code|--generate-code|-arch|-code|-gencode)(=|[ \t]|$)"
+set(
+    GB10X_CUDA_ARCHITECTURE_FLAG_REGEX
+    "(^|[ \t\r\n;])(--gpu-architecture|--gpu-code|--generate-code|-arch|-code|-gencode)(=|[ \t\r\n;]|$)"
 )
-    message(
-        FATAL_ERROR
-        "GB10X owns CUDA architecture selection; remove architecture flags from CMAKE_CUDA_FLAGS"
+
+function(gb10x_reject_cuda_architecture_flags source value)
+    if("${value}" MATCHES "${GB10X_CUDA_ARCHITECTURE_FLAG_REGEX}")
+        message(
+            FATAL_ERROR
+            "GB10X owns CUDA architecture selection; remove architecture flags from ${source}"
+        )
+    endif()
+endfunction()
+
+if(DEFINED CMAKE_CUDA_FLAGS)
+    gb10x_reject_cuda_architecture_flags(
+        CMAKE_CUDA_FLAGS
+        "${CMAKE_CUDA_FLAGS}"
     )
 endif()
+if(DEFINED CMAKE_CUDA_FLAGS_INIT)
+    gb10x_reject_cuda_architecture_flags(
+        CMAKE_CUDA_FLAGS_INIT
+        "${CMAKE_CUDA_FLAGS_INIT}"
+    )
+endif()
+if(DEFINED ENV{CUDAFLAGS})
+    gb10x_reject_cuda_architecture_flags(
+        "CUDAFLAGS environment variable"
+        "$ENV{CUDAFLAGS}"
+    )
+endif()
+
+get_cmake_property(gb10x_cache_variables CACHE_VARIABLES)
+foreach(gb10x_cache_variable IN LISTS gb10x_cache_variables)
+    if(gb10x_cache_variable MATCHES "^CMAKE_CUDA_FLAGS_.+")
+        gb10x_reject_cuda_architecture_flags(
+            "${gb10x_cache_variable}"
+            "${${gb10x_cache_variable}}"
+        )
+    endif()
+endforeach()
 
 set(
     CMAKE_CUDA_ARCHITECTURES
