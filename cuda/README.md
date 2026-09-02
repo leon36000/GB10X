@@ -50,7 +50,8 @@ cross-compilation.
 
 `CMAKE_CUDA_ARCHITECTURES` may be empty or `OFF` only.
 
-`CMAKE_CUDA_FLAGS` may not choose a CUDA architecture.
+`CMAKE_CUDA_FLAGS`, its configuration-specific variants, and the `CUDAFLAGS`
+environment variable may not choose a CUDA architecture.
 
 `GB10X_CUDA_NATIVE_TESTS=ON` requires `GB10X_CUDA_ENABLE=ON`.
 
