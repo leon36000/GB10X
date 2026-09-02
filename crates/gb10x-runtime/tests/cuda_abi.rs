@@ -41,6 +41,12 @@ fn constructors_encode_the_v1_output_contract() {
 }
 
 #[test]
+fn defaults_prepare_the_v1_output_contract() {
+    assert_eq!(CudaAbiInfo::default(), CudaAbiInfo::new());
+    assert_eq!(CudaDeviceInfo::default(), CudaDeviceInfo::new());
+}
+
+#[test]
 fn v1_numeric_constants_are_stable() {
     assert_eq!(CUDA_ABI_VERSION, 1);
     assert_eq!(CUDA_STATUS_OK, 0);
