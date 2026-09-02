@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -27,6 +28,28 @@ int require_ok(const char *operation, gb10x_cuda_status status) {
 } // namespace
 
 int main() {
+    if (gb10x_cuda_get_abi_info(nullptr) != GB10X_CUDA_STATUS_INVALID_ARGUMENT) {
+        return fail("null ABI output did not return invalid argument");
+    }
+
+    gb10x_cuda_abi_info mismatched_abi{};
+    mismatched_abi.struct_size = sizeof(mismatched_abi) - 1U;
+    mismatched_abi.abi_version = 77U;
+    if (gb10x_cuda_get_abi_info(&mismatched_abi) != GB10X_CUDA_STATUS_ABI_MISMATCH ||
+        mismatched_abi.abi_version != 77U) {
+        return fail("mismatched ABI output was not rejected without mutation");
+    }
+
+    gb10x_cuda_device_info invalid_ordinal{};
+    invalid_ordinal.struct_size = sizeof(invalid_ordinal);
+    invalid_ordinal.compute_major = 77U;
+    if (gb10x_cuda_probe_device(
+            std::numeric_limits<std::uint32_t>::max(),
+            &invalid_ordinal) != GB10X_CUDA_STATUS_INVALID_ARGUMENT ||
+        invalid_ordinal.compute_major != 77U) {
+        return fail("unrepresentable device ordinal was not rejected without mutation");
+    }
+
     if (gb10x_cuda_abi_version() != GB10X_CUDA_ABI_VERSION) {
         return fail("unexpected ABI version");
     }
