@@ -59,6 +59,12 @@ impl CudaAbiInfo {
     }
 }
 
+impl Default for CudaAbiInfo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// CUDA device facts reported by the CUDA ABI.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -94,6 +100,12 @@ impl CudaDeviceInfo {
             persisting_l2_max_bytes: 0,
             name: [0; 256],
         }
+    }
+}
+
+impl Default for CudaDeviceInfo {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
