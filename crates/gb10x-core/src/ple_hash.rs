@@ -111,8 +111,9 @@ impl PleHashPlan {
 
     /// Hash one token using the current left context, then append that token to the window.
     ///
-    /// Multiplication intentionally uses wrapping arithmetic to match the checkpoint/reference
-    /// implementation exactly. The returned rows are ordered by the 16 PLE hash heads.
+    /// Multiplication and XOR retain the low 64 bits, then the remainder interprets those bits as
+    /// signed i64, matching upstream PyTorch's int64 arithmetic and `torch.remainder`. The returned
+    /// rows are ordered by the 16 PLE hash heads.
     pub fn rows_for_token(
         &self,
         window: &mut PleTokenWindow,
@@ -139,7 +140,10 @@ impl PleHashPlan {
                 .skip(first_head)
                 .take(QWEN38_HEADS_PER_ORDER)
             {
-                let row = self.offsets[head] + mixed % self.vocab_sizes[head];
+                // The constructor bounds each positive table size by the u32 row space, so it
+                // fits i64. Euclidean remainder matches PyTorch even when wrapping set bit 63.
+                let remainder = (mixed as i64).rem_euclid(self.vocab_sizes[head] as i64) as u64;
+                let row = self.offsets[head] + remainder;
                 *row_slot = u32::try_from(row).map_err(|_| PleHashError::RowOverflow(row))?;
             }
         }

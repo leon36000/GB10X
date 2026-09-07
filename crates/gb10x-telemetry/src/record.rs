@@ -64,9 +64,10 @@ pub struct ExecutionConfig {
     pub runtime_config_digest: String,
     /// CPU placement/isolation policy.
     pub cpu_placement: CpuPlacement,
-    /// Compute precision label, for example `bf16`, `fp8` or `nvfp4`.
+    /// Numerical profile label. The initial exact source profile is `bf16`; labels such as `fp8`
+    /// or `nvfp4` require explicit experimental mode. This does not describe accumulator precision.
     pub precision_mode: String,
-    /// Weight/activation quantization label; use `none` when no quantization is active.
+    /// Weight/activation quantization label; the initial exact source profile requires `none`.
     pub quantization_mode: String,
     /// Prefix-cache state at measurement start.
     pub prefix_cache_state: CacheRunState,
@@ -169,7 +170,8 @@ pub struct CacheCounters {
     pub hot_overlay_bytes_read: u64,
 }
 
-/// End-to-end performance metrics. Floating-point values are validated as finite and positive.
+/// End-to-end performance metrics. Present values must be positive; floats must also be finite.
+/// Omit unavailable or sub-resolution measurements instead of recording a zero-valued result.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PerformanceMetrics {
     /// Prefill throughput.
@@ -304,6 +306,21 @@ impl EvidenceRecord {
             "execution.quantization_mode",
         )?;
 
+        if matches!(&self.identity.mode, ExecutionMode::Exact) {
+            if self.execution.precision_mode != "bf16" {
+                return invalid(
+                    "execution.precision_mode",
+                    "initial exact source profile requires bf16",
+                );
+            }
+            if self.execution.quantization_mode != "none" {
+                return invalid(
+                    "execution.quantization_mode",
+                    "initial exact source profile requires no quantization",
+                );
+            }
+        }
+
         match &self.execution.cpu_placement {
             CpuPlacement::Unpinned { reason } => {
                 require_nonempty(reason, "execution.cpu_placement.reason")?;
@@ -347,6 +364,13 @@ impl EvidenceRecord {
         )?;
         validate_positive_f64(self.performance.power_watts, "power_watts")?;
         validate_positive_f64(self.performance.tokens_per_joule, "tokens_per_joule")?;
+        validate_nonzero_u64(self.performance.ttft_micros, "ttft_micros")?;
+        validate_nonzero_u64(self.performance.p50_latency_micros, "p50_latency_micros")?;
+        validate_nonzero_u64(self.performance.p95_latency_micros, "p95_latency_micros")?;
+        validate_nonzero_u64(
+            self.performance.unified_memory_bytes,
+            "unified_memory_bytes",
+        )?;
 
         if !self.performance.has_any_measurement() {
             return Err(EvidenceError::Missing("performance"));

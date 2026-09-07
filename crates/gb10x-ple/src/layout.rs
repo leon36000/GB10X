@@ -15,6 +15,50 @@ pub struct HotOverlayPlacement {
     pub offset_in_block: u32,
 }
 
+/// Explicit policy limiting how many exact rows may be duplicated into a hot overlay.
+///
+/// The default planner remains unbounded for backward compatibility. A zero-row budget is valid
+/// and produces an exact cold-base-only plan.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct OverlayAdmissionBudget {
+    max_hot_rows: Option<u64>,
+    max_overlay_bytes: Option<u64>,
+}
+
+impl OverlayAdmissionBudget {
+    /// Admit every trace-distinct row that fits the PLEPack geometry.
+    pub const fn unbounded() -> Self {
+        Self {
+            max_hot_rows: None,
+            max_overlay_bytes: None,
+        }
+    }
+
+    /// Admit at most `max_hot_rows` trace-distinct rows.
+    pub const fn with_hot_row_cap(max_hot_rows: u64) -> Self {
+        Self {
+            max_hot_rows: Some(max_hot_rows),
+            max_overlay_bytes: None,
+        }
+    }
+
+    /// Add a cap for the block-padded bytes occupied by duplicated hot rows.
+    pub const fn with_overlay_byte_cap(mut self, max_overlay_bytes: u64) -> Self {
+        self.max_overlay_bytes = Some(max_overlay_bytes);
+        self
+    }
+
+    /// Optional maximum number of trace-distinct rows admitted to the overlay.
+    pub const fn max_hot_rows(&self) -> Option<u64> {
+        self.max_hot_rows
+    }
+
+    /// Optional maximum block-padded byte count occupied by duplicated hot rows.
+    pub const fn max_overlay_bytes(&self) -> Option<u64> {
+        self.max_overlay_bytes
+    }
+}
+
 /// Exact PLEPack layout: identity-mapped cold base plus bounded locality-optimized hot overlay.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct LayoutPlan {
@@ -65,6 +109,55 @@ impl LayoutPlan {
     pub fn block_bytes(&self) -> u32 {
         self.block_bytes
     }
+
+    /// Block-padded byte count occupied by duplicated hot rows.
+    ///
+    /// This excludes the fixed sidecar header and sorted overlay index. It is the byte quantity
+    /// governed by [`OverlayAdmissionBudget::with_overlay_byte_cap`].
+    pub fn hot_overlay_storage_bytes(&self) -> Result<u64, PlePackError> {
+        let _ = rows_per_overlay_block(self.row_bytes, self.block_bytes)?;
+        let Some(last_block) = self
+            .hot_overlay_placements
+            .iter()
+            .map(|placement| placement.block_id)
+            .max()
+        else {
+            return Ok(0);
+        };
+        last_block
+            .checked_add(1)
+            .and_then(|blocks| blocks.checked_mul(u64::from(self.block_bytes)))
+            .ok_or(PlePackError::Overflow("hot overlay storage size"))
+    }
+}
+
+fn rows_per_overlay_block(row_bytes: u32, block_bytes: u32) -> Result<u64, PlePackError> {
+    if row_bytes == 0 {
+        return Err(PlePackError::InvalidGeometry("row_bytes must be nonzero"));
+    }
+    if block_bytes < row_bytes {
+        return Err(PlePackError::InvalidGeometry(
+            "block_bytes must fit at least one complete row",
+        ));
+    }
+    Ok(u64::from(block_bytes / row_bytes))
+}
+
+fn overlay_storage_bytes_for_hot_rows(
+    hot_rows: u64,
+    row_bytes: u32,
+    block_bytes: u32,
+) -> Result<u64, PlePackError> {
+    if hot_rows == 0 {
+        return Ok(0);
+    }
+
+    let rows_per_block = rows_per_overlay_block(row_bytes, block_bytes)?;
+    let last_block = (hot_rows - 1) / rows_per_block;
+    last_block
+        .checked_add(1)
+        .and_then(|blocks| blocks.checked_mul(u64::from(block_bytes)))
+        .ok_or(PlePackError::Overflow("hot overlay storage size"))
 }
 
 /// Build a deterministic exact PLEPack layout from observed row co-access traces.
@@ -79,6 +172,26 @@ pub fn plan_exact_layout(
     row_bytes: u32,
     block_bytes: u32,
     trace: &[Vec<u32>],
+) -> Result<LayoutPlan, PlePackError> {
+    plan_exact_layout_with_budget(
+        row_count,
+        row_bytes,
+        block_bytes,
+        trace,
+        OverlayAdmissionBudget::unbounded(),
+    )
+}
+
+/// Build a deterministic exact PLEPack layout while admitting at most the supplied hot-row budget.
+///
+/// Admitted rows retain the same first-seen trace-group order as [`plan_exact_layout`]. Once the
+/// cap is full, later trace rows remain available through the exact cold base.
+pub fn plan_exact_layout_with_budget(
+    row_count: u64,
+    row_bytes: u32,
+    block_bytes: u32,
+    trace: &[Vec<u32>],
+    budget: OverlayAdmissionBudget,
 ) -> Result<LayoutPlan, PlePackError> {
     if row_count == 0 {
         return Err(PlePackError::InvalidGeometry("row_count must be nonzero"));
@@ -107,6 +220,7 @@ pub fn plan_exact_layout(
     let mut seen = BTreeSet::new();
     let mut hot_physical_order = Vec::new();
 
+    let mut admitted_rows = 0_u64;
     for batch in trace {
         let mut group = batch.clone();
         group.sort_unstable();
@@ -115,8 +229,27 @@ pub fn plan_exact_layout(
             if row as u64 >= row_count {
                 return Err(PlePackError::TraceRowOutOfRange { row, row_count });
             }
-            if seen.insert(row) {
+            if !seen.contains(&row) {
+                if budget
+                    .max_hot_rows
+                    .is_some_and(|max_hot_rows| admitted_rows == max_hot_rows)
+                {
+                    continue;
+                }
+                let next_admitted_rows = admitted_rows
+                    .checked_add(1)
+                    .ok_or(PlePackError::Overflow("hot overlay admission count"))?;
+                let next_overlay_bytes =
+                    overlay_storage_bytes_for_hot_rows(next_admitted_rows, row_bytes, block_bytes)?;
+                if budget
+                    .max_overlay_bytes
+                    .is_some_and(|max_overlay_bytes| next_overlay_bytes > max_overlay_bytes)
+                {
+                    continue;
+                }
+                seen.insert(row);
                 hot_physical_order.push(row);
+                admitted_rows = next_admitted_rows;
             }
         }
     }
@@ -208,5 +341,42 @@ mod tests {
     fn rejects_impossible_block_geometry_and_out_of_range_trace_rows() {
         assert!(plan_exact_layout(40, 320, 256, &trace()).is_err());
         assert!(plan_exact_layout(40, 320, 4096, &[vec![40]]).is_err());
+    }
+
+    #[test]
+    fn storage_size_rejects_malformed_deserialized_geometry() {
+        let plan = LayoutPlan {
+            row_count: 1,
+            row_bytes: 0,
+            block_bytes: 64,
+            hot_physical_order: vec![0],
+            hot_overlay_placements: vec![HotOverlayPlacement {
+                logical_row: 0,
+                block_id: 0,
+                offset_in_block: 0,
+            }],
+        };
+
+        assert_eq!(
+            plan.hot_overlay_storage_bytes(),
+            Err(PlePackError::InvalidGeometry("row_bytes must be nonzero"))
+        );
+    }
+
+    #[test]
+    fn storage_size_covers_the_furthest_deserialized_overlay_placement() {
+        let plan = LayoutPlan {
+            row_count: 4,
+            row_bytes: 16,
+            block_bytes: 64,
+            hot_physical_order: vec![1],
+            hot_overlay_placements: vec![HotOverlayPlacement {
+                logical_row: 1,
+                block_id: 3,
+                offset_in_block: 0,
+            }],
+        };
+
+        assert_eq!(plan.hot_overlay_storage_bytes(), Ok(256));
     }
 }

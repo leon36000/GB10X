@@ -8,6 +8,7 @@ repository.workspace = true
 [dependencies]
 gb10x-core = { path = "../gb10x-core" }
 serde.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 memmap2.workspace = true
@@ -15,4 +16,3 @@ hex.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-serde_json.workspace = true

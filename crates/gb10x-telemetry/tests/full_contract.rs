@@ -87,3 +87,120 @@ fn exact_and_approximate_cache_states_serialize_without_freeform_json() {
     assert!(json.contains("\"ple_cache_state\":\"warm\""));
     assert!(json.contains("\"cpu_placement\":{\"kind\":\"affinity\""));
 }
+
+#[test]
+fn exact_evidence_rejects_each_unsupported_precision_label() {
+    for precision in ["fp8", "nvfp4", "fp16", "fp32", "unknown", "BF16", "bf16 "] {
+        let mut record = full_record();
+        record.execution.precision_mode = precision.into();
+        assert!(
+            matches!(
+                record.validate(),
+                Err(EvidenceError::Invalid {
+                    field: "execution.precision_mode",
+                    ..
+                })
+            ),
+            "unsupported exact precision {precision:?} was not rejected",
+        );
+    }
+}
+
+#[test]
+fn exact_evidence_rejects_each_quantized_or_unknown_label() {
+    for quantization in [
+        "fp8",
+        "nvfp4",
+        "int8",
+        "ple-nvfp4",
+        "unknown",
+        "NONE",
+        "none ",
+    ] {
+        let mut record = full_record();
+        record.execution.quantization_mode = quantization.into();
+        assert!(
+            matches!(
+                record.validate(),
+                Err(EvidenceError::Invalid {
+                    field: "execution.quantization_mode",
+                    ..
+                })
+            ),
+            "unsupported exact quantization {quantization:?} was not rejected",
+        );
+    }
+}
+
+#[test]
+fn experimental_profiles_remain_explicit_through_json_roundtrip() {
+    for (precision, quantization) in [
+        ("bf16", "none"),
+        ("fp8", "fp8"),
+        ("nvfp4", "nvfp4"),
+        ("bf16", "ple-nvfp4"),
+        ("future-experiment", "custom"),
+    ] {
+        let mut record = full_record();
+        record.identity.mode = ExecutionMode::ExperimentalApproximate {
+            label: "independently-gated-experiment".into(),
+        };
+        record.execution.precision_mode = precision.into();
+        record.execution.quantization_mode = quantization.into();
+        record.validate().expect("labelled experimental evidence");
+        let encoded = serde_json::to_string(&record).unwrap();
+        let decoded: EvidenceRecord = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, record);
+        decoded.validate().unwrap();
+    }
+}
+
+#[test]
+fn each_present_integer_performance_measurement_must_be_positive() {
+    for field in [
+        "ttft_micros",
+        "p50_latency_micros",
+        "p95_latency_micros",
+        "unified_memory_bytes",
+    ] {
+        let mut value = serde_json::to_value(full_record()).unwrap();
+        value["performance"][field] = serde_json::json!(0);
+        let record: EvidenceRecord = serde_json::from_value(value).unwrap();
+        assert!(
+            matches!(record.validate(), Err(EvidenceError::Invalid { field: actual, .. }) if actual == field),
+            "zero-valued performance field {field} was not rejected",
+        );
+    }
+}
+
+#[test]
+fn positive_integer_performance_boundaries_are_accepted() {
+    for measured in [1, u64::MAX] {
+        let mut record = full_record();
+        record.performance.ttft_micros = Some(measured);
+        record.performance.p50_latency_micros = Some(measured);
+        record.performance.p95_latency_micros = Some(measured);
+        record.performance.unified_memory_bytes = Some(measured);
+        record.validate().expect("positive integer measurements");
+    }
+}
+
+#[test]
+fn omitted_performance_measurements_and_zero_stage_timers_remain_valid() {
+    let mut value = serde_json::to_value(full_record()).unwrap();
+    for field in [
+        "ttft_micros",
+        "p50_latency_micros",
+        "p95_latency_micros",
+        "unified_memory_bytes",
+    ] {
+        value["performance"].as_object_mut().unwrap().remove(field);
+    }
+    for stage in value["stages"].as_object_mut().unwrap().values_mut() {
+        *stage = serde_json::json!(0);
+    }
+    let record: EvidenceRecord = serde_json::from_value(value).unwrap();
+    record
+        .validate()
+        .expect("optional and sub-resolution timings");
+}
