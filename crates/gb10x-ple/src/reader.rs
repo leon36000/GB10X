@@ -19,7 +19,10 @@ pub struct PlePackReader<S: ExactPleRowSource> {
 }
 
 impl<S: ExactPleRowSource> PlePackReader<S> {
-    /// Open, hash-verify and structurally validate an exact PLEPack hot-overlay sidecar.
+    /// Open and fully verify an exact PLEPack hot-overlay sidecar.
+    ///
+    /// Opening reads every hot source row once for byte-for-byte comparison. The source and
+    /// published sidecar must remain immutable for the lifetime of the reader's mappings.
     pub fn open(path: impl AsRef<Path>, source: S) -> Result<Self, PlePackIoError> {
         let file = File::open(path)?;
         // SAFETY: the mapping is read-only, the File remains valid for map creation, and Mmap owns
@@ -76,7 +79,7 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
         let data_offset = usize::try_from(disk.data_offset)
             .map_err(|_| PlePackIoError::Format("overlay data offset does not fit usize"))?;
 
-        Ok(Self {
+        let reader = Self {
             mmap,
             source,
             header: disk.logical,
@@ -84,7 +87,9 @@ impl<S: ExactPleRowSource> PlePackReader<S> {
             index_offset,
             data_offset,
             overlay_bytes: disk.overlay_bytes,
-        })
+        };
+        reader.verify_hot_overlay()?;
+        Ok(reader)
     }
 
     /// Immutable exact sidecar provenance/geometry.

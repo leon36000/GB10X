@@ -59,8 +59,18 @@ pub struct Qwen38Config {
     pub num_key_value_heads: usize,
     /// Per-head dimension.
     pub head_dim: usize,
+    /// Hidden-layer activation function.
+    pub hidden_act: String,
+    /// Whether attention projections include bias terms.
+    pub attention_bias: bool,
+    /// Model parameter data type.
+    pub dtype: String,
     /// Partial RoPE factor.
     pub partial_rotary_factor: f64,
+    /// RoPE implementation type.
+    pub rope_type: String,
+    /// Partial RoPE factor repeated in the nested RoPE parameters.
+    pub rope_partial_rotary_factor: f64,
     /// GDN key-head count.
     pub linear_num_key_heads: usize,
     /// GDN value-head count.
@@ -184,7 +194,17 @@ impl Qwen38Config {
             num_attention_heads: required_usize(text, "num_attention_heads")?,
             num_key_value_heads: required_usize(text, "num_key_value_heads")?,
             head_dim: required_usize(text, "head_dim")?,
+            hidden_act: required_str_at(text, "hidden_act", "text_config.hidden_act")?.to_owned(),
+            attention_bias: required_bool_at(text, "attention_bias", "text_config.attention_bias")?,
+            dtype: required_str_at(text, "dtype", "text_config.dtype")?.to_owned(),
             partial_rotary_factor: required_f64(text, "partial_rotary_factor")?,
+            rope_type: required_str_at(rope, "rope_type", "text_config.rope_parameters.rope_type")?
+                .to_owned(),
+            rope_partial_rotary_factor: required_f64_at(
+                rope,
+                "partial_rotary_factor",
+                "text_config.rope_parameters.partial_rotary_factor",
+            )?,
             linear_num_key_heads: required_usize(text, "linear_num_key_heads")?,
             linear_num_value_heads: required_usize(text, "linear_num_value_heads")?,
             linear_key_head_dim: required_usize(text, "linear_key_head_dim")?,
@@ -235,7 +255,20 @@ impl Qwen38Config {
         expect_usize("num_attention_heads", self.num_attention_heads, 24)?;
         expect_usize("num_key_value_heads", self.num_key_value_heads, 2)?;
         expect_usize("head_dim", self.head_dim, 256)?;
+        expect_str("text_config.hidden_act", &self.hidden_act, "silu")?;
+        expect_bool("text_config.attention_bias", self.attention_bias, false)?;
+        expect_str("text_config.dtype", &self.dtype, "bfloat16")?;
         expect_f64("partial_rotary_factor", self.partial_rotary_factor, 0.25)?;
+        expect_str(
+            "text_config.rope_parameters.rope_type",
+            &self.rope_type,
+            "default",
+        )?;
+        expect_f64(
+            "text_config.rope_parameters.partial_rotary_factor",
+            self.rope_partial_rotary_factor,
+            0.25,
+        )?;
         expect_usize("linear_num_key_heads", self.linear_num_key_heads, 16)?;
         expect_usize("linear_num_value_heads", self.linear_num_value_heads, 48)?;
         expect_usize("linear_key_head_dim", self.linear_key_head_dim, 128)?;
@@ -364,17 +397,40 @@ fn required_usize(value: &Value, name: &'static str) -> Result<usize, Qwen38Conf
 }
 
 fn required_f64(value: &Value, name: &'static str) -> Result<f64, Qwen38ConfigError> {
+    required_f64_at(value, name, name)
+}
+
+fn required_f64_at(value: &Value, key: &str, name: &'static str) -> Result<f64, Qwen38ConfigError> {
     value
-        .get(name)
+        .get(key)
         .and_then(Value::as_f64)
         .filter(|raw| raw.is_finite())
         .ok_or(Qwen38ConfigError::Field(name))
 }
 
 fn required_str<'a>(value: &'a Value, name: &'static str) -> Result<&'a str, Qwen38ConfigError> {
+    required_str_at(value, name, name)
+}
+
+fn required_str_at<'a>(
+    value: &'a Value,
+    key: &str,
+    name: &'static str,
+) -> Result<&'a str, Qwen38ConfigError> {
     value
-        .get(name)
+        .get(key)
         .and_then(Value::as_str)
+        .ok_or(Qwen38ConfigError::Field(name))
+}
+
+fn required_bool_at(
+    value: &Value,
+    key: &str,
+    name: &'static str,
+) -> Result<bool, Qwen38ConfigError> {
+    value
+        .get(key)
+        .and_then(Value::as_bool)
         .ok_or(Qwen38ConfigError::Field(name))
 }
 
@@ -406,6 +462,14 @@ fn expect_usize(name: &str, actual: usize, expected: usize) -> Result<(), Qwen38
 
 fn expect_f64(name: &str, actual: f64, expected: f64) -> Result<(), Qwen38ConfigError> {
     if actual.to_bits() == expected.to_bits() {
+        Ok(())
+    } else {
+        Err(contract_mismatch(name, actual, expected))
+    }
+}
+
+fn expect_bool(name: &str, actual: bool, expected: bool) -> Result<(), Qwen38ConfigError> {
+    if actual == expected {
         Ok(())
     } else {
         Err(contract_mismatch(name, actual, expected))

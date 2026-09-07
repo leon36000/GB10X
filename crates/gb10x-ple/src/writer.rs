@@ -27,10 +27,11 @@ pub struct PlePackWriteReport {
 pub struct PlePackWriter;
 
 impl PlePackWriter {
-    /// Build and atomically publish an exact hot-overlay sidecar.
+    /// Build and atomically publish a new exact hot-overlay sidecar.
     ///
     /// The immutable cold base remains in `source`; only traced hot rows are duplicated. The final
-    /// path is replaced only after the temporary sidecar has been completely written and synced.
+    /// path must not already exist and is linked into place only after the temporary sidecar has
+    /// been completely written and synced.
     pub fn write_overlay<S: ExactPleRowSource>(
         path: impl AsRef<Path>,
         source: &S,
@@ -96,6 +97,7 @@ impl PlePackWriter {
             .ok_or(PlePackIoError::Format("sidecar file size overflow"))?;
 
         let temp_path = temporary_path(path);
+        let mut owns_temp = false;
         let result = (|| {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)?;
@@ -105,6 +107,7 @@ impl PlePackWriter {
                 .write(true)
                 .create_new(true)
                 .open(&temp_path)?;
+            owns_temp = true;
             file.set_len(file_bytes)?;
             file.seek(SeekFrom::Start(0))?;
             file.write_all(&disk_header.encode())?;
@@ -131,7 +134,9 @@ impl PlePackWriter {
 
             file.sync_all()?;
             drop(file);
-            std::fs::rename(&temp_path, path)?;
+            std::fs::hard_link(&temp_path, path)?;
+            std::fs::remove_file(&temp_path)?;
+            owns_temp = false;
             sync_parent_directory(path)?;
 
             Ok(PlePackWriteReport {
@@ -144,7 +149,7 @@ impl PlePackWriter {
             })
         })();
 
-        if result.is_err() {
+        if result.is_err() && owns_temp {
             let _ = std::fs::remove_file(&temp_path);
         }
         result
@@ -172,13 +177,7 @@ fn validate_source_plan<S: ExactPleRowSource>(
 }
 
 fn overlay_storage_bytes(plan: &LayoutPlan) -> Result<u64, PlePackIoError> {
-    let Some(last) = plan.hot_overlay_placements().last() else {
-        return Ok(0);
-    };
-    last.block_id
-        .checked_add(1)
-        .and_then(|blocks| blocks.checked_mul(plan.block_bytes() as u64))
-        .ok_or(PlePackIoError::Format("hot overlay storage size overflow"))
+    Ok(plan.hot_overlay_storage_bytes()?)
 }
 
 fn align_up(value: u64, alignment: u64) -> Result<u64, PlePackIoError> {
@@ -207,7 +206,10 @@ fn temporary_path(path: &Path) -> PathBuf {
 }
 
 fn sync_parent_directory(path: &Path) -> Result<(), PlePackIoError> {
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     File::open(parent)?.sync_all()?;
     Ok(())
 }

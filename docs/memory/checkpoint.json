@@ -1,0 +1,183 @@
+{
+  "bundle_sha256": "b3fa49001cc4df5bb9cd672d41a1659a6c123bdc7a95038678e9f8d8b12dc3af",
+  "checkpoint": {
+    "schema_version": 1,
+    "project_key": "gb10x",
+    "revision": 6,
+    "updated_at": "2026-09-07",
+    "repository": "leon36000/GB10X",
+    "entrypoint": "docs/memory/00-resume.md",
+    "local": {
+      "worktree": "/workspace/scratch/8bb39fb50649/GB10X-ple-source",
+      "branch": "feature/ple-source-recovery-20260905",
+      "head": "e3ef3384a20a3af640f418fa56ca32c62f7fc190",
+      "uncommitted": true,
+      "published": false,
+      "code_tree_sha256": "caffcdf84e29566e6bb802022cd05dbed925d122b042cb8190222b3a6ae693ab",
+      "code_file_count": 76
+    },
+    "remote_refs_observed_date": "2026-09-07",
+    "remote_refs": {
+      "main": "e3ef3384a20a3af640f418fa56ca32c62f7fc190",
+      "m3": "ae403f64e3dab0321c54dd67c87b01354b1b21ce",
+      "native_m2": "27b6aee194f3028341f7b23ebae80548a8cb4e5f"
+    },
+    "status": "validated-local-host-candidate-and-m3-abi-reconciled",
+    "completed": [
+      "host Safetensors source recovery and PLEPack safety",
+      "five stricter model-config fields",
+      "upstream PLE vectors and signed remainder correction",
+      "exact-profile and positive-metric telemetry validation",
+      "bounded exact PLEPack overlay admission with plan/build CLI controls",
+      "bounded physical Qwen PLE hash-buffer verifier and hash-verify CLI",
+      "M3 native ABI reconciliation documented and published on PR #3",
+      "revision-5 memory exact readback across Mongo, Neon and MCP TO PC search"
+    ],
+    "verification": {
+      "date": "2026-09-07",
+      "rust": "1.98.0",
+      "candidate_results": [
+        {
+          "check": "format",
+          "exit_code": 0
+        },
+        {
+          "check": "tests",
+          "exit_code": 0,
+          "totals": [
+            127,
+            0,
+            0
+          ]
+        },
+        {
+          "check": "clippy",
+          "exit_code": 0
+        },
+        {
+          "check": "release",
+          "exit_code": 0
+        },
+        {
+          "check": "diff",
+          "exit_code": 0
+        }
+      ],
+      "m3_abi_reconciliation": {
+        "commit": "ae403f64e3dab0321c54dd67c87b01354b1b21ce",
+        "pull_request": 3,
+        "github_actions_run": 254,
+        "github_actions_conclusion": "success",
+        "c11_headers": "M3 296 bytes/name offset 40; native-M2 304 bytes/name offset 48",
+        "rust_abi_tests": [
+          5,
+          0,
+          0
+        ],
+        "cmake": "unavailable on this host"
+      },
+      "evidence_paths": [
+        "docs/evidence/2026-09-07-telemetry-memory.md",
+        "docs/evidence/2026-09-07-overlay-budget.md",
+        "docs/evidence/2026-09-07-physical-hash-buffers.md",
+        "M3:docs/evidence/2026-09-07-native-abi-reconciliation.md"
+      ]
+    },
+    "dgx_health": {
+      "host_id": "gx10-e526",
+      "observed_date": "2026-09-07",
+      "source": "MCP TO PC host_status",
+      "online": false,
+      "ssh": "unreachable",
+      "tailscale_ping": "unreachable",
+      "gpu_validation_executed": false
+    },
+    "unverified": [
+      "physical pinned PLE hash buffers and full checkpoint identity",
+      "actual M3 CMake build and device smoke on GB10",
+      "model forward, logits/tokens, instrumentation and performance",
+      "held-out trace and end-to-end promotion evidence for an overlay budget"
+    ],
+    "next_actions": [
+      "read this checkpoint and relevant domains on each relaunch; verify live state",
+      "run hash-verify on an actual local pinned Qwen checkpoint without loading the full model",
+      "run M3 CMake configure/build/CTest on actual GB10 when reachable",
+      "define held-out trace and end-to-end promotion gate before any overlay promotion"
+    ],
+    "scope_exclusions": [
+      "GLM-5.3 Flash engine/models/services",
+      "Qwen27B training/datasets",
+      "AgentOS",
+      "other project memories"
+    ],
+    "document_index": [
+      {
+        "path": "AGENTS.md",
+        "sha256": "0dad12079cd70676fa2a0f29f78c9926b03cf417e0279fe455bcdaac3acee419",
+        "bytes": 1170
+      },
+      {
+        "path": "docs/memory/00-resume.md",
+        "sha256": "4c7da1470b42fb2404f29751d2b45f4cd0603458db759a6b8756ddb9ffca6616",
+        "bytes": 2580
+      },
+      {
+        "path": "docs/memory/01-scope-decisions.md",
+        "sha256": "4df86946e5e4429042283424cc28ab136bbb96eb7f2185b466fd5435cdfe22df",
+        "bytes": 1541
+      },
+      {
+        "path": "docs/memory/02-repository.md",
+        "sha256": "e4c692545190982556ecd4b55d8e93abf939009d7544a07e16598a632570b9bc",
+        "bytes": 1775
+      },
+      {
+        "path": "docs/memory/03-model-ple.md",
+        "sha256": "f5661fccc9bb35afe181b4ec48abe1a9030de9993655394a53eeda968ba74611",
+        "bytes": 2372
+      },
+      {
+        "path": "docs/memory/04-storage-cache.md",
+        "sha256": "8dca25e7a0a93aad3750d08ba0d46ee0dc9ae2e66375c0db713bc6986b5799dd",
+        "bytes": 2839
+      },
+      {
+        "path": "docs/memory/05-native-hardware.md",
+        "sha256": "17e672c2df525b906166519fbfd0d6faab46ae87b38850f2eae072c7e5d432cd",
+        "bytes": 1767
+      },
+      {
+        "path": "docs/memory/06-validation-telemetry.md",
+        "sha256": "0161c344449a80e47df39d32ad5cc8dc7c234e7c3e09c9deb28947ab7757e56f",
+        "bytes": 1434
+      },
+      {
+        "path": "docs/memory/07-memory-sync.md",
+        "sha256": "1f1450d7c7be526e9c8f3cc9d4462f2386d4d1151a54192b0831d4054b596f9f",
+        "bytes": 2497
+      }
+    ],
+    "memory_targets": {
+      "neon": {
+        "project_id": "steep-paper-03426819",
+        "branch_id": "br-polished-flower-awene32m",
+        "database": "neondb",
+        "table": "public.gb10x_memory_state",
+        "project_key": "gb10x"
+      },
+      "mongodb": {
+        "project_id": "6a9508bee9631f2b9e685733",
+        "cluster": "gb10x-memory",
+        "database": "gb10x_memory",
+        "collection": "checkpoints",
+        "document_id": "gb10x:current"
+      },
+      "mcp_to_pc": {
+        "marker": "GB10X-CANONICAL-MEMORY",
+        "project_id": null,
+        "project_key": "gb10x"
+      }
+    },
+    "supersedes_revision": 5
+  }
+}
