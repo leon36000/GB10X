@@ -5,6 +5,8 @@
 
 /// Host-independent CPU cache ownership policy.
 pub mod cache_fabric;
+/// C-compatible CUDA ABI types and unlinked native entry-point declarations.
+pub mod cuda_abi;
 /// Linux CPU/cache topology and host probing.
 pub mod linux_probe;
 /// Host-independent PLE-Hydra tier simulation.

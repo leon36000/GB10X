@@ -29,6 +29,17 @@ Still unverified:
 - production safetensors source binding;
 - full Qwen inference or any performance claim.
 
+## M3 added; native validation pending
+
+M3 adds an opt-in CUDA `sm_121a` build contract, a stable C ABI v1, an
+unlinked Rust layout mirror, and a GB10 device-probe smoke source. CUDA
+compilation and execution remain unverified until the documented DGX Spark
+commands succeed; this repository's existing CI remains host-independent and
+Rust-only.
+
+See [`cuda/README.md`](cuda/README.md) for the native prerequisites, exact
+configure/build/CTest commands, and fail-closed configuration rules.
+
 M1 PLEPack uses a prepared flat exact-row source for executable verification. The sidecar duplicates only measured hot rows; cold rows remain in the immutable source. Direct model-safetensors integration belongs to the native/model-loading milestone.
 
 See `docs/evidence/m1-bootstrap-verification.md` for the verification boundary and `docs/superpowers/specs/2026-08-31-gb10x-cache-first-v3-design.md` for the approved architecture.
